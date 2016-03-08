@@ -1,0 +1,12 @@
+#ifndef BINMAP_VERSION_HPP
+#define BINMAP_VERSION_HPP
+
+#define BINMAP_VERSION "@BINMAP_VERSION_MAJOR@.@BINMAP_VERSION_MINOR@"
+
+/** hold the list of all drivers (ELF etc) */
+#define BINMAP_DRIVERS "@BINMAP_DRIVERS@"
+
+/** set to 1 if we're not only building the scanner */
+#cmakedefine01 BINMAP_FULL
+
+#endif
