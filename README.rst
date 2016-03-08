@@ -22,7 +22,12 @@ The following packages are needed:
 
     - cmake
     - g++
-    - libboost-dev
+    - libboost-python1.55-dev
+    - libboost-system1.55-dev
+    - libboost-program-options1.55-dev
+    - libboost-filesystem1.55-dev
+    - libboost-regex1.55-dev
+    - libboost-serialization1.55-dev
     - zlib1g-dev
     - libssl-dev
     - libelfg0-dev
