@@ -1,0 +1,21 @@
+language: c++
+addons:
+    apt:
+        sources:
+            - boost-latest
+            - ubuntu-toolchain-r-test
+        packages:
+            - cmake
+            - g++
+            - libboost-dev
+            - zlib1g-dev
+            - libssl-dev
+            - libelfg0-dev
+
+script:
+    - mkdir _build
+    - cd _build
+    - cmake .. -DCMAKE_INSTALL_PREFIX=$PWD/install
+    - make
+    - make test
+    - make install
