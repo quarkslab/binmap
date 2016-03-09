@@ -1,5 +1,5 @@
 ======
-Binamp
+Binmap
 ======
 
 
