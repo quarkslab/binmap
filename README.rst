@@ -68,6 +68,10 @@ Using binmap is a two step process:
 
     $ ./binmap scan -v1 /usr/local -o local.dat
 
+   or, if you want to scan an extracted file system and only include references to this chroot::
+
+    $ ./binmap scan -v1 --chroot ./extracted_fs -o local.dat
+
    This creates a database containing informations about the binaries that lie in this directory.
 
 2. Dump the database to the dot format::
