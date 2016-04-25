@@ -10,6 +10,7 @@
 // hash_collections_save_imp.hpp: serialization for stl collections
 
 // (C) Copyright 2002 Robert Ramey - http://www.rrsd.com . 
+// (C) Copyright 2014 Jim Bell
 // Use, modification and distribution is subject to the Boost Software
 // License, Version 1.0. (See accompanying file LICENSE_1_0.txt or copy at
 // http://www.boost.org/LICENSE_1_0.txt)
@@ -39,7 +40,7 @@ inline void save_unordered_collection(Archive & ar, const Container &s)
     collection_size_type count(s.size());
     const collection_size_type bucket_count(s.bucket_count());
     const item_version_type item_version(
-        version<BOOST_DEDUCED_TYPENAME Container::value_type>::value
+        version<typename Container::value_type>::value
     );
 
     #if 0
@@ -64,14 +65,14 @@ inline void save_unordered_collection(Archive & ar, const Container &s)
         ar << BOOST_SERIALIZATION_NVP(item_version);
     #endif
 
-    BOOST_DEDUCED_TYPENAME Container::const_iterator it = s.begin();
+    typename Container::const_iterator it = s.begin();
     while(count-- > 0){
         // note borland emits a no-op without the explicit namespace
         boost::serialization::save_construct_data_adl(
             ar, 
             &(*it), 
             boost::serialization::version<
-                BOOST_DEDUCED_TYPENAME Container::value_type
+                typename Container::value_type
             >::value
         );
         ar << boost::serialization::make_nvp("item", *it++);
