@@ -19,7 +19,7 @@ static void xxd(std::istream & in, std::ostream & out) {
 }
 
 int main(int argc, char* argv[]) {
-    if(argc < 2 or argc > 3)
+    if(argc < 2 || argc > 3)
         return 1;
     std::ifstream input(argv[1], std::ios::binary);
     if(argc == 2)
