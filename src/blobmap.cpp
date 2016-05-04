@@ -34,7 +34,6 @@
  */
 
 namespace {
-#ifdef __linux__
 // pretty pint helper: prints elements from ``iterable'' separated by a comma
 template <class T> struct line_formater {
   T const &iterable;
@@ -54,7 +53,6 @@ std::ostream &operator<<(std::ostream &os, line_formater<T> const &lf) {
 template <class T> line_formater<T> make_line_formater(T const &iterable) {
   return line_formater<T>(iterable);
 }
-#endif
 }
 
 // a diff is empty if they have the same metadata and the same dependencies
@@ -64,7 +62,6 @@ bool NodeDiff::empty() const {
 
 BlobMapDiff::BlobMapDiff() {}
 
-#ifdef __linux__
 // prints a diff using a typical
 // ++++ new value
 // ---- old value
@@ -96,7 +93,6 @@ std::ostream &operator<<(std::ostream &os, NodeDiff const &nd) {
   }
   return os;
 }
-#endif
 
 /******************************
  * BlobMapView Implementation
