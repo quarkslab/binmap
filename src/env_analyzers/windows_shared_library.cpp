@@ -422,7 +422,6 @@ ApiSetMap::ApiSetMap(std::ifstream &file) : file_(file) {
 void ApiSetMap::parse_apisetmap_v2(uint8_t* apisetsection){
     //TODO: implement this!
     logging::log(logging::error) << "ApiSetMap::parse_apisetmap_v2: not implemented" << std::endl;
-    throw std::runtime_error("ApiSetMap::parse_apisetmap_v2: not implemented");
 }
 
 void ApiSetMap::parse_apisetmap_v4(uint8_t* apisetsection){

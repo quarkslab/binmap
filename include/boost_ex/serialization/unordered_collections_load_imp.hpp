@@ -11,6 +11,7 @@
 // unordered_collections_load_imp.hpp: serialization for loading stl collections
 
 // (C) Copyright 2002 Robert Ramey - http://www.rrsd.com . 
+// (C) Copyright 2014 Jim Bell
 // Use, modification and distribution is subject to the Boost Software
 // License, Version 1.0. (See accompanying file LICENSE_1_0.txt or copy at
 // http://www.boost.org/LICENSE_1_0.txt)
@@ -46,7 +47,6 @@ namespace stl {
 template<class Archive, class Container, class InputFunction>
 inline void load_unordered_collection(Archive & ar, Container &s)
 {
-    s.clear();
     collection_size_type count;
     collection_size_type bucket_count;
     boost::serialization::item_version_type item_version(0);
@@ -59,6 +59,7 @@ inline void load_unordered_collection(Archive & ar, Container &s)
     if(boost::archive::library_version_type(3) < library_version){
         ar >> BOOST_SERIALIZATION_NVP(item_version);
     }
+    s.clear();
     s.rehash(bucket_count);
     InputFunction ifunc;
     while(count-- > 0){

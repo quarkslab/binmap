@@ -23,10 +23,12 @@ set(BINMAP_DRIVERS "native" CACHE STRING "drivers used by the scanners")
 if(BINMAP_FULL)
     # full fledge mode, shared libraries etc
     set(Boost_USE_STATIC_LIBS OFF)
-    set(Boost_USE_MULTITHREADED OFF)
     set(Boost_USE_STATIC_RUNTIME OFF)
     if(WIN32)
-      add_definitions(-DBOOST_ALL_DYN_LINK)
+        set(Boost_USE_MULTITHREADED ON)
+        add_definitions(-DBOOST_ALL_DYN_LINK)
+    else()
+        set(Boost_USE_MULTITHREADED OFF)
     endif()
 else()
     # think embded : static libraries
@@ -191,6 +193,10 @@ if(BINMAP_FULL)
         src/metadata.cpp
         )
     set_target_properties(blobmap PROPERTIES PREFIX "")
+    if (WIN32)
+        set_target_properties(example PROPERTIES SUFFIX ".pyd")
+    endif()
+
     target_link_libraries(blobmap ${PYTHON_LIBRARIES} ${OPENSSL_LIBRARIES} ${Boost_LIBRARIES})
 endif()
 
