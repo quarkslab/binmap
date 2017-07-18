@@ -1,4 +1,8 @@
 language: c++
+env:
+    - BINMAP_FULL=ON
+    - BINMAP_FULL=OFF
+
 addons:
     apt:
         sources:
@@ -20,7 +24,7 @@ addons:
 script:
     - mkdir _build
     - cd _build
-    - cmake .. -DCMAKE_INSTALL_PREFIX=$PWD/install
+    - cmake .. -DCMAKE_INSTALL_PREFIX=$PWD/install -DBINMAP_FULL=${BINMAP_FULL}
     - make
-    - make test
+    - test "${BINMAP_FULL}" = OFF || make test
     - make install

@@ -1,0 +1,29 @@
+os: Visual Studio 2015
+
+configuration: Release
+
+# scripts to run before build
+before_build:
+  - md C:\projects\zlib
+  - cd C:\projects\zlib
+  - appveyor DownloadFile https://github.com/madler/zlib/archive/v1.2.8.tar.gz
+  - 7z x v1.2.8.tar.gz -so | 7z x -si -ttar > nul
+  - cd zlib-1.2.8
+  - cmake -G "Visual Studio 14 2015" -DCMAKE_INSTALL_PREFIX=C:\projects\zlib\install
+  - cmake --build . --config release
+
+build_script:
+  - cd C:\projects\binmap
+  - md build
+  - cd build
+  - cmake -G "Visual Studio 14 2015" -DCMAKE_INSTALL_PREFIX=%P% \
+          -DZLIB_LIBRARY=C:\projects\zlib\zlib-1.2.8 -DZLIB_INCLUDE_DIR=C:\projects\zlib\zlib-1.2.8 \
+          -DBOOST_ROOT=C:\Libraries\boost_1_59_0 -DBOOST_LIBRARYDIR=C:\Libraries\boost_1_59_0\lib32-msvc-12.0
+          -DBINMAP_FULL=OFF \
+          -DCMAKE_BUILD_TYPE=Release \
+          ..
+  - cmake --build .
+
+test: off
+#test_script:
+#  - cmd: ctest --build-config %configuration% --parallel 4 --output-on-failure
