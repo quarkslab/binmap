@@ -10,7 +10,7 @@ addons:
             - ubuntu-toolchain-r-test
         packages:
             - cmake
-            - g++
+            - g++-5
             - libboost-python1.55-dev
             - libboost-system1.55-dev
             - libboost-program-options1.55-dev
@@ -21,10 +21,19 @@ addons:
             - libssl-dev
             - libelfg0-dev
 
+cache:
+  - apt
+  - ccache
+
 script:
     - mkdir _build
     - cd _build
-    - cmake .. -DCMAKE_INSTALL_PREFIX=$PWD/install -DBINMAP_FULL=${BINMAP_FULL}
+    - >
+      cmake ..
+      -DCMAKE_C_COMPILER=gcc-5
+      -DCMAKE_CXX_COMPILER=g++-5
+      -DCMAKE_INSTALL_PREFIX=$PWD/install
+      -DBINMAP_FULL=${BINMAP_FULL}
     - make
     - test "${BINMAP_FULL}" = OFF || make test
     - make install

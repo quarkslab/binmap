@@ -24,8 +24,9 @@
 #include <cstdlib>
 #include <cstring>
 #include <cerrno>
-#include <gelf.h>
 #include <iostream>
+
+#include <LIEF/ELF.h>
 
 #include <stdexcept>
 
@@ -45,19 +46,14 @@ class ELFCollector : public Collector {
 
     static bool initialized;
     FILE* fd_;
-    Elf* elf_;
+    Elf_Binary_t* elf_binary_;
     boost::filesystem::path path_;
 
 public:
 
-  ELFCollector() : fd_(0), elf_(0) {
+  ELFCollector() : fd_(0), elf_binary_(0) {
     if (!initialized) {
       initialized = true;
-      /* initialize ELF library
-       * mandatory!
-       * */
-      if (elf_version(EV_CURRENT) == EV_NONE)
-        throw std::runtime_error(elf_errmsg(-1));
     }
   }
 
@@ -67,14 +63,11 @@ public:
       return false;
 
     path_ = input_file;
-    if (fd_ = fopen(input_file.c_str(), "r")) {
-      int fno = fileno(fd_);
-      if (elf_ = elf_begin(fno, ELF_C_READ, 0)) {
-        Elf_Kind ek = elf_kind(elf_);
-        if (ek != ELF_K_ELF) {
-          return false;
-        }
-      }
+    const char* cpath = path_.string().c_str();
+    if (is_elf(cpath)) {
+      this->elf_binary_ = elf_parse(cpath);
+      std::cout << cpath << std::endl;
+      return true;
     } else {
       return false;
     }
@@ -82,33 +75,16 @@ public:
   }
 
   ~ELFCollector() {
-    if(elf_) elf_end(elf_);
     if(fd_) fclose(fd_);
+    if (this->elf_binary_) elf_binary_destroy(this->elf_binary_);
   }
 
   std::string get_interp() {
-    GElf_Phdr phdr;
-    char *interp = 0;
-    for (int index = 0; gelf_getphdr(elf_, index, &phdr); ++index) {
-      if (phdr.p_type == PT_INTERP) {
-        long curr = ftell(fd_);
-        if (fseek(fd_, phdr.p_offset, SEEK_SET))
-          throw std::runtime_error(strerror(errno));
-        interp = new char[phdr.p_memsz];
-        if (fread(interp, 1, phdr.p_memsz, fd_) < phdr.p_memsz)
-          throw std::runtime_error("inconsistent ELF header: interp field");
-        if (fseek(fd_, curr, SEEK_SET))
-          throw std::runtime_error(strerror(errno));
-        break;
-      }
-    }
-    if (interp) {
-      std::string theinterp(interp);
-      delete[] interp;
-      return theinterp;
-    }
-    else
+    if (this->elf_binary_->interpreter) {
+      return this->elf_binary_->interpreter;
+    } else {
       return "";
+    }
   }
 
   void operator()(std::set<boost::filesystem::path> &deps) {
@@ -116,121 +92,111 @@ public:
      * there is one for executables and shared libraries
      * but not for static libraries
      */
-    GElf_Phdr phdr;
+
     std::string interp = get_interp();
-    if (not interp.empty())
+
+    if (!interp.empty()) {
       deps.insert(Env::root() / interp);
+    }
 
-    Elf_Scn *scn = 0;
-    GElf_Shdr scn_shdr;
-    /* Process sections */
-    while ((scn = elf_nextscn(elf_, scn))) {
 
-      gelf_getshdr(scn, &scn_shdr);
+    Elf_DynamicEntry_t** entries = this->elf_binary_->dynamic_entries;
+    std::vector<boost::filesystem::path> paths[2];
+    std::vector<boost::filesystem::path> &rpaths   = paths[0],
+                                         &runpaths = paths[1];
+    {
+      std::vector<std::string> paths_[2];
+      std::vector<std::string> &rpaths   = paths_[0],
+                               &runpaths = paths_[1];
 
-      /* Only look at SHT_DYNAMIC section */
-      if (scn_shdr.sh_type == SHT_DYNAMIC) {
-        Elf_Data *data = 0;
+      for (size_t i = 0; entries[i] != NULL; ++i) {
+        /* look for rpath or runpath specifications */
+        if (entries[i]->tag == DT_RPATH) {
+          Elf_DynamicEntry_Rpath_t* entry = reinterpret_cast<Elf_DynamicEntry_Rpath_t*>(entries[i]);
+          const char *rpath = entry->rpath;
+          boost::split(rpaths, rpath, boost::is_any_of(":"));
 
-        /* Process data blocks in the section */
-        while ((data = elf_getdata(scn, data))) {
-          GElf_Dyn dyn;
-          std::vector<boost::filesystem::path> paths[2];
-          std::vector<boost::filesystem::path> &rpaths = paths[0],
-                                               &runpaths = paths[1];
+        } else if (entries[i]->tag == DT_RUNPATH) {
+          Elf_DynamicEntry_RunPath_t* entry = reinterpret_cast<Elf_DynamicEntry_RunPath_t*>(entries[i]);
+          const char *runpath = entry->runpath;
+          boost::split(runpaths, runpath, boost::is_any_of(":"));
+        }
+      }
 
-          {
-            std::vector<std::string> paths_[2];
-            std::vector<std::string> &rpaths = paths_[0], &runpaths = paths_[1];
+      for (size_t j = 0; j < 2; ++j) {
+        paths[j].resize(paths_[j].size());
+        for (size_t i = 0; i < paths_[j].size(); i++) {
+          boost::replace_all(
+            paths_[j][i], "$ORIGIN",
+            boost::filesystem::path(path_).parent_path().native());
+            paths[j][i] = Env::root() / paths_[j][i];
+        }
+      }
+    }
+    for (size_t i = 0; entries[i] != NULL; ++i) {
 
-            /* look for rpath or runpath specifications */
-            for (int i_dyn = 0;
-                 gelf_getdyn(data, i_dyn, &dyn) && dyn.d_tag != DT_NULL;
-                 i_dyn++) {
-              if (dyn.d_tag == DT_RPATH) {
-                const char *rpath =
-                    elf_strptr(elf_, scn_shdr.sh_link, dyn.d_un.d_val);
-                boost::split(rpaths, rpath, boost::is_any_of(":"));
-              } else if (dyn.d_tag == DT_RUNPATH) {
-                const char *runpath =
-                    elf_strptr(elf_, scn_shdr.sh_link, dyn.d_un.d_val);
-                boost::split(runpaths, runpath, boost::is_any_of(":"));
-              }
-            }
-            for (size_t j = 0; j < 2; ++j) {
-              paths[j].resize(paths_[j].size());
-              for (size_t i = 0; i < paths_[j].size(); i++) {
-                boost::replace_all(
-                    paths_[j][i], "$ORIGIN",
-                    boost::filesystem::path(path_).parent_path().native());
-                paths[j][i] = Env::root() / paths_[j][i];
-              }
-            }
-          }
-          /* Process entries in dynamic linking table */
-          for (int i_dyn = 0;
-               gelf_getdyn(data, i_dyn, &dyn) && dyn.d_tag != DT_NULL;
-               i_dyn++) {
-            if (dyn.d_tag == DT_NEEDED) {
-              boost::filesystem::path path;
-              boost::filesystem::path const dep_lib =
-                  elf_strptr(elf_, scn_shdr.sh_link, dyn.d_un.d_val);
-              /* step 1:  Using the directories specified in the DT_RPATH
-               * dynamic
-               * section attribute of the binary if present and DT_RUNPATH
-               * attribute does not exist.  Use of DT_RPATH is deprecated
-               */
-              if (runpaths.empty() and not rpaths.empty()) {
-                if (Env::which(path, rpaths, dep_lib)) {
-                  deps.insert(path);
-                  continue;
-                }
-              }
-
-              /* step 2: Using the environment variable LD_LIBRARY_PATH.  Except
-               * if  the  executable is a set-user-ID/set-group-ID binary, in
-               * which case it is ignored.
-               */
-
-              // NIY
-
-              /* step 3: (ELF  only)  Using the directories specified in the
-               * DT_RUNPATH dynamic section attribute of the binary if present.
-               */
-              if (not runpaths.empty()) {
-                if (Env::which(path, runpaths, dep_lib)) {
-                  deps.insert(path);
-                  continue;
-                }
-              }
-
-              /* step 4: From the cache file /etc/ld.so.cache, which contains  a
-               * compiled  list  of candidate  libraries  previously  found in
-               * the augmented library path.  If, however, the  binary  was
-               * linked  with  the  -z  nodeflib  linker  option, libraries in
-               * the default library paths are skipped.  Libraries installed in
-               * hardware  capability  directories  (see  below)  are  preferred
-               * to   other libraries.
-               */
-
-              if (Env::get("SHARED_LIBRARY")(path, dep_lib)) {
-                deps.insert(path);
-                continue;
-              }
-
-              /* step 5: In the default path /lib, and then /usr/lib.  If the
-               * binary was linked with the -z nodeflib linker option, this step
-               * is skipped.
-               */
-              if (Env::which(path, Env::get("SHARED_LIBRARY").default_paths(),
-                             dep_lib))
-                deps.insert(path);
-              else {
-                deps.insert(dep_lib);
-              }
-            }
+      if (entries[i]->tag == DT_NEEDED) {
+        Elf_DynamicEntry_Library_t* library_entry = reinterpret_cast<Elf_DynamicEntry_Library_t*>(entries[i]);
+        boost::filesystem::path path;
+        boost::filesystem::path const dep_lib = library_entry->name;
+        /* step 1:  Using the directories specified in the DT_RPATH
+         * dynamic
+         * section attribute of the binary if present and DT_RUNPATH
+         * attribute does not exist.  Use of DT_RPATH is deprecated
+         */
+        if (runpaths.empty() && !rpaths.empty()) {
+          if (Env::which(path, rpaths, dep_lib)) {
+            deps.insert(path);
+            continue;
           }
         }
+
+        /* step 2: Using the environment variable LD_LIBRARY_PATH.  Except
+         * if  the  executable is a set-user-ID/set-group-ID binary, in
+         * which case it is ignored.
+         */
+
+        // NIY
+
+        /* step 3: (ELF  only)  Using the directories specified in the
+         * DT_RUNPATH dynamic section attribute of the binary if present.
+         */
+        if (!runpaths.empty()) {
+          if (Env::which(path, runpaths, dep_lib)) {
+            deps.insert(path);
+            continue;
+          }
+        }
+
+        /* step 4: From the cache file /etc/ld.so.cache, which contains  a
+         * compiled  list  of candidate  libraries  previously  found in
+         * the augmented library path.  If, however, the  binary  was
+         * linked  with  the  -z  nodeflib  linker  option, libraries in
+         * the default library paths are skipped.  Libraries installed in
+         * hardware  capability  directories  (see  below)  are  preferred
+         * to   other libraries.
+         */
+
+        if (Env::get("SHARED_LIBRARY")(path, dep_lib)) {
+          deps.insert(path);
+          continue;
+        }
+
+
+        /* step 5: In the default path /lib, and then /usr/lib.  If the
+         * binary was linked with the -z nodeflib linker option, this step
+         * is skipped.
+         */
+        if (Env::which(path, Env::get("SHARED_LIBRARY").default_paths(),
+                       dep_lib))
+        {
+          deps.insert(path);
+        } else if(boost::filesystem::exists(path_.parent_path() / dep_lib)) {
+          deps.insert(path_.parent_path() / dep_lib);
+        } else {
+          deps.insert(dep_lib);
+        }
+
       }
     }
 
@@ -260,35 +226,24 @@ public:
 private:
   void extract_symbols(MetadataInfo &mi)
   {
-    Elf_Scn *scn = 0;
-    GElf_Shdr scn_shdr;
-    /* Process sections */
-    while ((scn = elf_nextscn(elf_, scn))) {
+    Elf_Symbol_t **dynamic_symbols = this->elf_binary_->dynamic_symbols;
+    Elf_Symbol_t **static_symbols = this->elf_binary_->static_symbols;
 
-      gelf_getshdr(scn, &scn_shdr);
-
-      if (scn_shdr.sh_type == SHT_SYMTAB or scn_shdr.sh_type == SHT_DYNSYM) {
-        Elf_Data *symtab = elf_getdata(scn, 0);
-        long symtab_count = scn_shdr.sh_size / scn_shdr.sh_entsize;
-        Elf_Scn *scn = elf_getscn(elf_, scn_shdr.sh_link);
-        Elf_Data *data = elf_getdata(scn, 0);
-        char* strtab = reinterpret_cast<char*>(data->d_buf);
-
-        for (long i = 0; i < symtab_count; ++i) {
-          GElf_Sym sym;
-          GElf_Addr addr;
-          const char *name;
-
-          gelf_getsym(symtab, i, &sym);
-          char *sname = strtab + sym.st_name;
-          if(sym.st_shndx == SHN_UNDEF) // U
-            mi.add_imported_symbol(sname);
-          else if(GELF_ST_BIND(sym.st_info) & STB_GLOBAL or GELF_ST_BIND(sym.st_info) & STB_WEAK)
-            mi.add_exported_symbol(sname);
-        }
+    for (size_t i = 0; dynamic_symbols[i] != NULL; ++i) {
+      if (dynamic_symbols[i]->is_imported) {
+        mi.add_imported_symbol(dynamic_symbols[i]->name);
+      } else if (dynamic_symbols[i]->is_exported) {
+        mi.add_exported_symbol(dynamic_symbols[i]->name);
       }
     }
 
+    for (size_t i = 0; static_symbols[i] != NULL; ++i) {
+      if (static_symbols[i]->is_imported) {
+        mi.add_imported_symbol(static_symbols[i]->name);
+      } else if (static_symbols[i]->is_imported) {
+        mi.add_exported_symbol(static_symbols[i]->name);
+      }
+    }
   }
 
   struct is_fortified {
@@ -300,7 +255,7 @@ private:
   void extract_hardening_features(MetadataInfo &mi)
   {
     // feature test strongly inspired from the source code of /usr/bin/hardening-check from the hardening-includes debian package
-    if(is_dyn() and has_phdr()) {
+    if(is_dyn() && has_phdr()) {
       mi.add_hardening_feature(MetadataInfo::POSITION_INDEPENDANT_EXECUTABLE);
     }
     // see http://refspecs.linux-foundation.org/LSB_4.0.0/LSB-Core-generic/LSB-Core-generic/libc---stack-chk-fail-1.html
@@ -319,53 +274,32 @@ private:
 
   }
   bool is_dyn() {
-    GElf_Ehdr ehdr;
-    if(gelf_getehdr(elf_, &ehdr)) {
-      return ehdr.e_type == ET_DYN;
-    }
-    return false;
+    return this->elf_binary_->header.file_type == ET_DYN;
   }
 
   bool has_bind_now() {
-    Elf_Scn *scn = 0;
-    GElf_Shdr scn_shdr;
-    /* Process sections */
-    while ((scn = elf_nextscn(elf_, scn))) {
-
-      gelf_getshdr(scn, &scn_shdr);
-
-      /* Only look at SHT_DYNAMIC section */
-      if (scn_shdr.sh_type == SHT_DYNAMIC) {
-        Elf_Data *data = 0;
-
-        /* Process data blocks in the section */
-        while ((data = elf_getdata(scn, data))) {
-          GElf_Dyn dyn;
-          for (int i_dyn = 0; gelf_getdyn(data, i_dyn, &dyn) && dyn.d_tag != DT_NULL;
-               i_dyn++) {
-            if (dyn.d_tag == DT_BIND_NOW) {
-              return true;
-            }
-          }
-        }
+    Elf_DynamicEntry_t **entries = this->elf_binary_->dynamic_entries;
+    for (size_t i = 0; entries[i] != NULL; ++i) {
+      if (entries[i]->tag == DT_BIND_NOW) {
+        return true;
       }
     }
     return false;
   }
 
   bool has_relro() {
-    GElf_Phdr phdr;
-    for (int index = 0; gelf_getphdr(elf_, index, &phdr); ++index) {
-      if (phdr.p_type == PT_GNU_RELRO ) {
+    Elf_Segment_t **segments = this->elf_binary_->segments;
+    for (size_t i = 0; segments[i] != NULL; ++i) {
+      if (segments[i]->type == PT_GNU_RELRO) {
         return true;
       }
     }
     return false;
   }
   bool has_phdr() {
-    GElf_Phdr phdr;
-    for (int index = 0; gelf_getphdr(elf_, index, &phdr); ++index) {
-      if (phdr.p_type == PT_PHDR ) {
+    Elf_Segment_t **segments = this->elf_binary_->segments;
+    for (size_t i = 0; segments[i] != NULL; ++i) {
+      if (segments[i]->type == PT_PHDR) {
         return true;
       }
     }
@@ -402,6 +336,7 @@ private:
 
   void extract_version(std::string &version, std::string const &canonical_name,
                        boost::filesystem::path const &input_path) const {
+
     // First try: from the naming scheme
     boost::filesystem::path::string_type const &native = input_path.native();
     static char const needle[] = ".so.";
@@ -419,23 +354,15 @@ private:
     std::set<std::string> versions;
     VersionScanner version_scanner(canonical_name);
 
-    int fno = fileno(fd_);
-    Elf_Scn *scn = 0;
-    GElf_Shdr scn_shdr;
-    /* look for rodata sections */
-    while ((scn = elf_nextscn(elf_, scn))) {
-
-      gelf_getshdr(scn, &scn_shdr);
-      /* thats a .rodata */
-      if (scn_shdr.sh_type == SHT_PROGBITS) {
-        Elf_Data *data = 0;
-        while ((data = elf_getdata(scn, data))) {
-          char *buffer = static_cast<char *>(data->d_buf);
-          char *buffer_end = buffer + data->d_size;
-          version_scanner(versions, buffer, buffer_end);
-        }
+    Elf_Section_t **sections = this->elf_binary_->sections;
+    for (size_t i = 0; sections[i] != NULL; ++i) {
+      if (sections[i]->type == SHT_PROGBITS) {
+        version_scanner(versions,
+            reinterpret_cast<const char*>(sections[i]->content),
+            reinterpret_cast<const char*>(sections[i]->content) + sections[i]->size);
       }
     }
+
     if (versions.size() == 1) {
       version = *versions.begin();
     }
