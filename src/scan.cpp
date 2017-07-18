@@ -107,6 +107,7 @@ public:
         if (collector.get()) {
           Hash input_hash(input_file);
 
+
           boost::filesystem::path path_to_add = add_node(input_file, input_hash);
 
 	  if (path_to_add == input_file || visited_.find(path_to_add) == visited_.end()) {
@@ -126,7 +127,7 @@ public:
 			// error during its processing
 			logging::log(logging::warning) << "bad format: skipping "
 						   << input_file
-						   << " (error was:" << e.what()
+						   << " (error was:" << e.what() << ')'
 						   << std::endl;
 			// still write dummy metadata for consistency
 			blobmap_.metadata()->insert(MetadataInfo(input_hash));
@@ -220,7 +221,7 @@ private:
 
     boost::algorithm::to_lower(dll_name);
     boost::filesystem::path path_low = (path.parent_path() / dll_name);
-    
+
     std::string const& spath = path_low.string();
     // only trim root if root is a prefix
     if (root.size() < spath.size()

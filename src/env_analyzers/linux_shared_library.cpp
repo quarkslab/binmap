@@ -173,7 +173,11 @@ public:
       fill_cache(cache_path.string());//TODO: fix for windows (.native() against string())
 
     /* fill the default search path */
-    static char const * default_paths[] = {"/lib", "/usr/lib", "/system/lib"};
+    static char const * default_paths[] = {
+      "/lib",
+      "/usr/lib",
+      "/system/lib"
+      };
     BOOST_FOREACH(char const* path, default_paths) {
       boost::filesystem::path fullpath = root / path;
       if(boost::filesystem::exists(fullpath)) {
