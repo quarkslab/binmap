@@ -55,6 +55,12 @@ class Graph {
   mapping_;
   mutable std::vector<int> *distance_matrix_;
 
+/********************AJOUT PAR MOI*********************/
+  boost::unordered_map<boost::filesystem::path, int> passed_path_;
+  boost::unordered_map<boost::filesystem::path, int>::iterator it_p_;
+  boost::unordered_map<boost::filesystem::path, graph_type::vertex_descriptor>::iterator
+	map_p_;
+
 public:
   Graph();
   ~Graph();
@@ -72,7 +78,7 @@ public:
   bool has_path(boost::filesystem::path const &from,
                 boost::filesystem::path const &to) const;
 
-  void add_node(boost::filesystem::path const &input_file,
+  boost::filesystem::path add_node(boost::filesystem::path const &input_file,
                 Hash const &input_hash);
 
   graph_type const &graph() const;
@@ -138,6 +144,9 @@ template <class T> class GraphProjection {
   graph_type graph_;
   boost::unordered_map<T, typename graph_type::vertex_descriptor> mapping_;
 
+/**********************AJOUTE PAR MOI***************/
+  boost::unordered_map<T, typename boost::filesystem::path> passed_path_;
+
 public:
   typedef typename boost::graph_traits<graph_type>::vertex_iterator
   vertex_iterator;
@@ -145,7 +154,7 @@ public:
     return mapping_.find(key) != mapping_.end();
   }
 
-  void add_node(T const &key) {
+  boost::filesystem::path add_node(T const &key) {
     assert(not has_node(key));
     typename graph_type::vertex_descriptor v = boost::add_vertex(graph_);
     mapping_[key] = v;

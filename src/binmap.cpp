@@ -155,7 +155,7 @@ public:
   }
 };
 
-struct canonicalize_path {
+struct canonicalize {
 
   void operator()(boost::filesystem::path &path) const {
     path = boost::filesystem::canonical(path, ".");
@@ -176,13 +176,13 @@ class ScanCommand : public SubCommand {
     else {
       str_inputs = vm_["inputs"].as<std::vector<std::string> >();
       std::copy(str_inputs.begin(), str_inputs.end(), std::back_inserter(inputs));
-      std::for_each(inputs.begin(), inputs.end(), canonicalize_path());
+      std::for_each(inputs.begin(), inputs.end(), canonicalize());
     }
 
     std::vector<boost::filesystem::path> blacklist;
     if (vm_.count("exclude") != 0)
       blacklist = vm_["exclude"].as<std::vector<boost::filesystem::path> >();
-    std::for_each(blacklist.begin(), blacklist.end(), canonicalize_path());
+    std::for_each(blacklist.begin(), blacklist.end(), canonicalize());
 
     boost::filesystem::path output;
     if (vm_.count("output") != 0)

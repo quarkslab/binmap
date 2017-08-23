@@ -62,12 +62,23 @@ void PECollector::operator()(std::set<boost::filesystem::path> &deps) {
 
 
 void PECollector::operator()(MetadataInfo &mi) {
-    // collect exported functions
-  std::vector<std::string> exports;
-  _pe->get_exports(_path, exports);
-  mi.add_exported_symbols(exports.begin(), exports.end());
-  //collect hardening features
-  _pe->extract_hardening_features(mi);
+	// collect exported functions
+	std::vector<std::string> exports;
+	std::vector<std::string> imported_symbols;
+	std::vector<std::string> imported_symbols2;
+	logging::log(logging::info) << "Symbols of : " << _path << std::endl;
+	_pe->get_exports(_path, exports);
+
+	_pe->get_imported_symbols(_path, imported_symbols);
+	
+	_pe->get_delay_imports(_path, imported_symbols2);
+
+	mi.add_imported_symbols(imported_symbols.begin(), imported_symbols.end());
+	mi.add_imported_symbols(imported_symbols2.begin(), imported_symbols2.end());
+	mi.add_exported_symbols(exports.begin(), exports.end());
+	
+	//collect hardening features
+	_pe->extract_hardening_features(mi);
 }
 
 // static collector

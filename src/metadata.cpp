@@ -41,7 +41,8 @@ boost::unordered_set<std::string> const &MetadataInfo::exported_symbols() const 
 void MetadataInfo::add_exported_symbol(std::string const &value) { exported_symbols_.insert(value); }
 
 boost::unordered_set<std::string> const &MetadataInfo::imported_symbols() const { return imported_symbols_; }
-void MetadataInfo::add_imported_symbol(std::string const &value) { imported_symbols_.insert(value); }
+void MetadataInfo::add_imported_symbol(std::string const &value) {
+ imported_symbols_.insert(value); }
 
 boost::unordered_set<MetadataInfo::hardening_feature_t> const &MetadataInfo::hardening_features() const { return hardening_features_; }
 void MetadataInfo::add_hardening_feature(hardening_feature_t const &value) { hardening_features_.insert(value); }

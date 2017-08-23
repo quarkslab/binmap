@@ -34,6 +34,7 @@
 
 #include <boost/foreach.hpp>
 #include <boost/algorithm/string/predicate.hpp>
+#include <boost/algorithm/string/join.hpp>
 #include <boost/filesystem/operations.hpp>
 
 /**
@@ -257,7 +258,7 @@ void pe_decoder<_Bits>::get_imports(boost::filesystem::path const &module_path, 
         else{
             // not a redirection scheme and no import table...
             // Note: do NOT throw, we might have modules that do not export anything!
-            logging::log(logging::error) << "module " << module_path << " has no import table." << std::endl;
+            logging::log(logging::error) << "ERROR : module " << module_path << " has no import table." << std::endl;
             return;
         }
     }
@@ -296,13 +297,13 @@ void pe_decoder<_Bits>::get_imports(boost::filesystem::path const &module_path, 
         std::string dll_name;
         _file.seekg(dll_name_off, std::ios_base::beg);
         if (!std::getline(_file, dll_name, '\0')){
-            logging::log(logging::error) << "couldn't read name offset for module " << module_path
+            logging::log(logging::error) << "ERROR : couldn't read name offset for module " << module_path
                 << " at offset " << std::hex << dll_name_off << std::endl;
             continue;
         }
 
         if (dll_name.empty()){
-            logging::log(logging::error) << "import name for module " << module_path
+            logging::log(logging::error) << "ERROR : import name for module " << module_path
                 << " at offset " << std::hex << dll_name_off << " is empty." << std::endl;
             continue;
         }
@@ -310,18 +311,90 @@ void pe_decoder<_Bits>::get_imports(boost::filesystem::path const &module_path, 
         //names are case unsensitive on windows!
         std::transform(dll_name.begin(), dll_name.end(), dll_name.begin(), ::tolower);
 
+	boost::filesystem::path full_path;
         // try to resolve full module path
         if (!find_module_path(module_path, dll_name)){
             logging::log(logging::warning) << "couldn't find full path for module " << dll_name
                 << " imported by module " << module_path << std::endl;
-        }
+		full_path = Env::root() / "./" / dll_name;
+		logging::log(logging::warning) << "dll name:" << full_path << "\n";
+        }else{
 
         //push module into imports (even if we couldn't find its full path).
-        boost::filesystem::path full_path = Env::root() / dll_name;
+        	full_path = module_path;// Env::root() / dll_name;
+	}
         imports.insert(full_path);
 
+
     } while (::memcmp(&imp_desc, &imp_end, sizeof(PeImportDescriptor)));
+
+
+	uint32_t delay_imports_rva =
+        _pe_data.nt_headers().OptionalHeader.DataDirectory[PeDataDirectory::kEntryDelayImport]
+        .VirtualAddress;
+    uint32_t delay_imports_len =
+        _pe_data.nt_headers().OptionalHeader.DataDirectory[PeDataDirectory::kEntryDelayImport]
+        .Size;
+
+    if (delay_imports_rva == 0 || delay_imports_len == 0){
+        return;
+    }
+
+    uint32_t delay_imports_off;
+    if (!convert_rva_to_offset(delay_imports_rva, delay_imports_off))
+        throw std::runtime_error("pe_decoder::get_delay_imports: bad convert_rva_to_offset");
+
+
+    int step = sizeof(_pe_data.nt_headers().OptionalHeader.ImageBase);
+    uint32_t name_off=1;
+    while(name_off!=0){
+	name_off=0;
+	PeImageDelayImport delay_imports_dir;
+	if (!_pe_data.read(delay_imports_off, sizeof(PeImageDelayImport), reinterpret_cast<char*>(&delay_imports_dir))) {
+		throw std::runtime_error("pe_decoder::get_delay_imports: couldn't read delay_imports directory");
+	}
+
+	if(delay_imports_dir.szName == 0){
+		return;
+	}
+
+	if (!convert_rva_to_offset(delay_imports_dir.szName, name_off)){
+		return;
+	}
+
+	//TODO : associate name + ordinal + func pointer !
+	std::string dep_name;
+	if (!_pe_data.read_line(name_off, dep_name)){
+	    //continue;
+	}else{
+		logging::log(logging::info) << "find delay_import dependencie: " << dep_name <<"\n";
+	}
+
+
+	std::transform(dep_name.begin(), dep_name.end(), dep_name.begin(), ::tolower);
+
+
+	boost::filesystem::path full_path;
+        // try to resolve full module path
+        if (!find_module_path(module_path, dep_name)){
+            logging::log(logging::warning) << "couldn't find full path for module " << dep_name
+                << " imported by module " << module_path << std::endl;
+		full_path = Env::root() / "./" / dep_name;
+		logging::log(logging::warning) << "dll name:" << full_path << "\n";
+        }else{
+
+        //push module into imports (even if we couldn't find its full path).
+        	full_path = module_path;// Env::root() / dll_name;
+	}
+        imports.insert(full_path);
+
+	delay_imports_off += sizeof(PeImageDelayImport);
+    }
 }
+
+
+
+
 
 /**
 * \brief Parse the resources.
@@ -384,7 +457,7 @@ bool pe_decoder<_Bits>::parse_manifest(std::map<std::string, boost::filesystem::
     uint32_t num_entries;
     if (!parser.get_first_dir_entry_from_dir_entry(manifest_entry, sub_entry, num_entries)){
         logging::log(logging::error) <<
-            "pe_decoder::parse_resources: error getting sub-entry for RT_MANIFEST."
+            "ERROR : pe_decoder::parse_resources: error getting sub-entry for RT_MANIFEST."
             << std::endl;
         return false;
     }
@@ -399,7 +472,7 @@ bool pe_decoder<_Bits>::parse_manifest(std::map<std::string, boost::filesystem::
     PeImageResourceDirectoryEntry sub_sub_entry;
     if (!parser.get_first_dir_entry_from_dir_entry(sub_entry, sub_sub_entry, num_entries)){
         logging::log(logging::error) <<
-            "pe_decoder::parse_resources: error getting sub-sub-entry for RT_MANIFEST."
+            "ERROR : pe_decoder::parse_resources: error getting sub-sub-entry for RT_MANIFEST."
             << std::endl;
         return false;
     }
@@ -414,7 +487,7 @@ bool pe_decoder<_Bits>::parse_manifest(std::map<std::string, boost::filesystem::
     PeImageResourceDataEntry data_entry;
     if(!parser.get_data_entry_from_dir_entry(sub_sub_entry, data_entry)){
         logging::log(logging::error) <<
-            "pe_decoder::parse_resources: could'nt get data entry from entry."
+            "ERROR : pe_decoder::parse_resources: could'nt get data entry from entry."
             << std::endl;
         return false;
     }
@@ -423,7 +496,7 @@ bool pe_decoder<_Bits>::parse_manifest(std::map<std::string, boost::filesystem::
     char* buffer;
     if (!parser.get_data_from_data_entry(data_entry, &buffer)){
         logging::log(logging::error) <<
-            "pe_decoder::parse_resources: couldn't get data from data entry."
+            "ERROR : pe_decoder::parse_resources: couldn't get data from data entry."
             << std::endl;
         return false;
     }
@@ -537,6 +610,280 @@ bool pe_decoder<_Bits>::find_module_path(boost::filesystem::path const &containi
     return result;
 }
 
+/*****************************************
+	GET_IMPORTED_SYMBOLS
+*****************************************/
+
+template <typename _Bits>
+bool pe_decoder<_Bits>::get_imported_symbols(boost::filesystem::path const &module_path, std::vector<std::string> &imported_symbols) const {
+	logging::log(logging::info) <<"start_imported_symbols\n";
+    uint32_t imp_rva =
+       _pe_data.nt_headers().OptionalHeader.DataDirectory[PeDataDirectory::kEntryImport]
+        .VirtualAddress;
+    uint32_t imp_len =
+        _pe_data.nt_headers().OptionalHeader.DataDirectory[PeDataDirectory::kEntryImport]
+        .Size;
+
+    if (imp_rva == 0x0 || imp_len == 0x0)
+    {
+        //check if this module is part of the apisetschema redirection scheme
+        //    in this case there's no import table, we'll do the redirection statically.
+        std::string module_filename = module_path.filename().string();
+        if (boost::starts_with(module_filename, WINDOWS_APISETSCHEMA_API_START) ||
+            boost::starts_with(module_filename, WINDOWS_APISETSCHEMA_EXT_START))
+        {
+            std::string empty;
+            find_module_path(module_path, empty);
+	    logging::log(logging::warning) << "Apisetschema redirection scheme\n";
+            return false;
+        }
+        else{
+            // not a redirection scheme and no import table...
+            // Note: do NOT throw, we might have modules that do not export anything!
+            logging::log(logging::error) << "ERROR : module " << module_path << " has no import table." << std::endl;
+            return false;
+        }
+    }
+
+	uint32_t imp_off;
+	if (!convert_rva_to_offset(imp_rva, imp_off)){
+		logging::log(logging::error) << "ERROR : pe_decoder: bad convert_rva_to_offset"<< std::endl;
+		throw std::runtime_error("pe_decoder: bad convert_rva_to_offset");
+	}
+	PeImportDescriptor imp_desc, imp_end;
+	::memset(&imp_end, 0x0, sizeof(imp_end));
+	do{
+
+        //read import descriptor
+        _file.seekg(imp_off, std::ios_base::beg);
+        if (!_file.read(reinterpret_cast<char*>(&imp_desc), sizeof(imp_desc))){
+		logging::log(logging::error) << "ERROR : pe_decoder: couldn't read import descriptor"<< std::endl;
+            // critical error: can't read PE file...
+            throw std::runtime_error("pe_decoder: couldn't read import descriptor");
+        }
+
+        imp_off += sizeof(imp_desc);
+
+/****************************************************
+Il faut ajouter aux imported_symbols au fur et à mesure :
+PeImportDescriptor _imp_dep;
+_imp_dep.FirstThunk => rva to offset => rva to offset bis => passer deux char + read
+***************************************************/
+	uint32_t thunk_off;
+	if(imp_desc.OriginalFirstThunk==0){
+		logging::log(logging::info) <<"out_imported_symbols\n";
+		return true;
+	}
+	if (!convert_rva_to_offset(imp_desc.OriginalFirstThunk, thunk_off)){
+		printf("FirstThunk rva : %08x\n", imp_desc.OriginalFirstThunk);
+		logging::log(logging::error) << "ERROR : pe_decoder: couldn't convert import FirstThunk rva to offset"<< std::endl;
+		return false;
+	}
+
+//readThe Function RVA on the FristThunk :
+//TODO : make a function in data.cpp
+	
+	int step = sizeof(_pe_data.nt_headers().OptionalHeader.ImageBase);
+	uint64_t func_rva=1;
+	char func_buff[64];
+	uint64_t func_off=0;
+	bool bad_convert=false;
+
+	while(func_rva != 0){
+		func_rva=0;
+		func_off=0;
+		bool bad_convert=false;
+		std::string func_name;
+
+		if (!_file.seekg(thunk_off, std::ios_base::beg)){
+			logging::log(logging::error) << "ERROR : pe_decoder: couldn't go to thunk offset"<< std::endl;
+			return false;
+		}
+
+		if(!_file.read(func_buff, step)){
+			logging::log(logging::error) << "ERROR : pe_decoder: couldn't find function name rva"<< std::endl;
+			return false;
+		}
+	
+
+		for (int k=0; k<step; k++){
+			func_rva += (uint64_t)(func_buff[k]+256)%256 * (int)(pow(256,k));
+		}
+
+		if(func_rva ==0){
+			logging::log(logging::info) << "func_rva=0\n";
+			break;
+		}
+		
+		//printf("step: %d\nfunc_rva: %08x, %llx\n", step, func_rva, func_rva);
+		if (!convert_rva_to_offset64(func_rva, func_off)){
+			//logging::log(logging::error) << "ERROR : pe_decoder: couldn't convert function rva to offset (imported_symbols)"<< std::endl;
+			logging::log(logging::info) << "Imported : N/A\n";
+			bad_convert=true;
+		}
+	
+		if(bad_convert == false){
+			func_off += 2;	
+
+			if (!_pe_data.read_line(func_off, func_name)){
+				logging::log(logging::error) << "ERROR : couldn't read function name from dll (imported_symbols)"
+				<< " at offset " << std::hex << func_off << std::endl;
+				func_name="";
+			    	continue;
+			}else{
+
+				logging::log(logging::info) << "find imported symbol: " << func_name <<"\n";
+				imported_symbols.push_back(func_name);
+			}
+		}
+		thunk_off += step;
+		bad_convert=false;
+	}
+
+
+/********************************************/
+    } while (::memcmp(&imp_desc, &imp_end, sizeof(PeImportDescriptor)));
+	logging::log(logging::info) <<"out_imported_symbols\n";
+	return true;
+}
+
+/***********************************************************
+
+AJOUTÉ : PHASE DE TEST
+
+
+
+************************************************************/
+
+/*********************************************
+dans pe.hpp:
+struct PeImageDelayImport {
+	uint32_t dd_grAttrs;
+	uint32_t szName;
+	uint32_t phmod;
+	uint32_t pIAT;
+	uint32_t pINT;
+	uint32_t pBoundIAT;
+	uint32_t pUnloadIAT;
+	uint32_t dwTimeStamp;
+};
+*********************************************/
+
+
+template <typename _Bits>
+bool pe_decoder<_Bits>::get_delay_imports(const boost::filesystem::path  &module_path, std::vector<std::string> &imported_symbols) const
+{
+	logging::log(logging::info) <<"start_delay_imports\n";
+    uint32_t delay_imports_rva =
+        _pe_data.nt_headers().OptionalHeader.DataDirectory[PeDataDirectory::kEntryDelayImport]
+        .VirtualAddress;
+    uint32_t delay_imports_len =
+        _pe_data.nt_headers().OptionalHeader.DataDirectory[PeDataDirectory::kEntryDelayImport]
+        .Size;
+
+    if (delay_imports_rva == 0 || delay_imports_len == 0){
+	logging::log(logging::info) <<"no_delay_import: out\n";
+        return false;
+    }
+
+    uint32_t delay_imports_off;
+    if (!convert_rva_to_offset(delay_imports_rva, delay_imports_off)){
+	logging::log(logging::error) << "ERROR : pe_decoder::get_delay_imports: bad convert_rva_to_offset"<< std::endl;
+        return false;
+	}
+
+    int step = sizeof(_pe_data.nt_headers().OptionalHeader.ImageBase);
+    uint32_t name_off=1;
+    while(name_off!=0){
+	name_off=0;
+	PeImageDelayImport delay_imports_dir;
+	if (!_pe_data.read(delay_imports_off, sizeof(PeImageDelayImport), reinterpret_cast<char*>(&delay_imports_dir))) {
+		logging::log(logging::error) << "ERROR : pe_decoder::get_delay_imports: couldn't read delay_imports directory"<< std::endl;
+		return false;
+	}
+
+	if(delay_imports_dir.szName == 0){
+		logging::log(logging::info) <<"out_delay_imports: name_off = 0\n";
+		return true;
+	}
+
+	if (!convert_rva_to_offset(delay_imports_dir.szName, name_off)){
+		return false;
+	}
+
+	//TODO : associate name + ordinal + func pointer !
+	std::string dep_name;
+	if (!_pe_data.read_line(name_off, dep_name)){
+	    //continue;
+	}else{
+		logging::log(logging::info) << "find delay_import dependencie: " << dep_name <<"\n";
+	}
+
+	uint64_t func_rva=1;
+	uint64_t func_off=0;
+	char func_buff[64];
+	std::string func_name;
+	uint32_t pINT;
+	if (!convert_rva_to_offset(delay_imports_dir.pINT, pINT)){
+		logging::log(logging::error) << "ERROR : pe_decoder: couldn't convert import FirstThunk rva to offset"<< std::endl;
+		return false;
+	}
+
+	while(func_rva != 0){
+		func_rva=0;
+		func_off=0;
+
+		if (!_file.seekg(pINT, std::ios_base::beg)){
+			logging::log(logging::error) << "ERROR : pe_decoder: couldn't find function name rva (delay_import)-go to pINT"<< std::endl;
+			return false;
+		}
+
+		if(!_file.read(func_buff, step)){
+			logging::log(logging::error) << "ERROR : pe_decoder: couldn't find function name rva (delay_import)"<< std::endl;
+			return false;
+		}
+
+		for (int k=0; k<step; k++){
+			func_rva += (func_buff[k]+0x100)%0x100 * (pow(0x100,k));
+		}
+
+		/*printf("pINT: %08x\n",pINT);
+		if(pINT==0x004b45f8){
+			printf("func_rva: %llx\n", func_rva);
+		}*/
+		if(func_rva !=0){
+
+			if (!convert_rva_to_offset64(func_rva, func_off)){
+				logging::log(logging::warning) << "WARNING : couldn't convert function rva to offset, pINT=" << pINT <<std::endl;
+			}else{
+				func_off += 2;	
+
+				if (!_pe_data.read_line(func_off, func_name)){
+					logging::log(logging::error) << "ERROR : couldn't read function name from dll "
+					<< " at offset " << std::hex << func_off << std::endl;
+					func_name="";
+					//continue;
+				}else{
+
+					logging::log(logging::info) << "find imported function (delay_load): " << func_name <<"\n";
+					imported_symbols.push_back(func_name);
+				}
+			}
+		}
+		pINT += step;
+	}
+	logging::log(logging::info) <<"out_delay_imports\n";
+	delay_imports_off += sizeof(PeImageDelayImport);
+    }
+    return true;
+
+}
+
+/************************************************************/
+/************************************************************/
+/************************************************************/
+/************************************************************/
+
 /**
 * \brief Get all exported functions for a given module.
 *
@@ -603,6 +950,8 @@ bool pe_decoder<_Bits>::get_exports(const boost::filesystem::path  &module_path,
         return false;
     }
 
+    logging::log(logging::info) << "Nb of exported_symbol (name): " << export_dir.NumberOfNames << std::endl;
+
     for (unsigned int i = 0; i < export_dir.NumberOfNames; ++i){
         //get RVA to func name in names table and convert this RVA to an offset
         uint32_t rva_to_name = names_table[i];
@@ -614,9 +963,11 @@ bool pe_decoder<_Bits>::get_exports(const boost::filesystem::path  &module_path,
         //TODO : associate name + ordinal + func pointer !
         std::string func_name;
         if (!_pe_data.read_line(off_to_name, func_name)){
+	    logging::log(logging::info) << "can't read name" << std::endl;
             continue;
         }
-
+	
+	logging::log(logging::info) << "exported_symbol: " << func_name << std::endl;
         exports.push_back(func_name);
     }
 
@@ -692,6 +1043,12 @@ template <typename _Bits>
 bool pe_decoder<_Bits>::convert_rva_to_offset(uint32_t rva,
     uint32_t &offset) const {
     return _pe_data.convert_rva_to_offset(rva, offset);
+}
+
+template <typename _Bits>
+bool pe_decoder<_Bits>::convert_rva_to_offset64(uint64_t rva,
+    uint64_t &offset) const {
+    return _pe_data.convert_rva_to_offset64(rva, offset);
 }
 
 // explicit template specialisation
