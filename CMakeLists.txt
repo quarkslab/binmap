@@ -193,9 +193,9 @@ if(BINMAP_FULL)
         src/metadata.cpp
         )
     set_target_properties(blobmap PROPERTIES PREFIX "")
-    #if (WIN32)
-    #    set_target_properties(example PROPERTIES SUFFIX ".pyd")
-    #endif()
+    if (WIN32)
+        set_target_properties(example PROPERTIES SUFFIX ".pyd")
+    endif()
 
     target_link_libraries(blobmap ${PYTHON_LIBRARIES} ${OPENSSL_LIBRARIES} ${Boost_LIBRARIES})
 endif()

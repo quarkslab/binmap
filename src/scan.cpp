@@ -180,7 +180,7 @@ private:
   void analyze_metadata(Collector &collector,
                         Hash const &input_hash) {
     try {    
-	MetadataInfo mi(input_hash);
+      MetadataInfo mi(input_hash);
       collector(mi);
       blobmap_.metadata()->insert(mi);
     }

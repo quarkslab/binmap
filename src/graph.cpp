@@ -108,11 +108,10 @@ void Graph::add_edge(boost::filesystem::path const &from,
     assert(has_node(to_path));
   }
   
-  //std::cout << "from: " << from << " to: " << to_path <<"\n";
+
 #pragma omp critical(graph_)
   
   if(from != to_path){ 
-    //boost::remove_edge(mapping_[from], mapping_[to_path], graph_);
     boost::add_edge(mapping_[from], mapping_[to_path], graph_);
   }
 }
@@ -148,11 +147,9 @@ void Graph::compute_distance_matrix() const {
 boost::filesystem::path Graph::add_node(boost::filesystem::path const &input_file,
                      Hash const &input_hash) {
   if(not has_node(input_file)){
-//#pragma omp critical(graph_)
-  //{
+
     if (passed_path_.find(input_file.parent_path()) == passed_path_.end()){ //path not parsed yet
 	passed_path_[input_file.parent_path()] = 1;
-	//std::cout << "YOP\n";
     }
 
 
@@ -161,7 +158,7 @@ boost::filesystem::path Graph::add_node(boost::filesystem::path const &input_fil
     std::string file = input_file.string();
 
     if(input_file.parent_path() == no_path1 || input_file.parent_path() == no_path2){
-	//std::cout<<"/. or .\n";
+	boost::unordered_map<boost::filesystem::path, int>::iterator it_p_;
 
 	for (it_p_=passed_path_.begin(); it_p_!=passed_path_.end();it_p_++){
 		if(it_p_->first != no_path1 && 
@@ -171,27 +168,19 @@ boost::filesystem::path Graph::add_node(boost::filesystem::path const &input_fil
 		}
 	}
     }else{
-	//std::cout << "neither /. or .\n";
 	boost::filesystem::path known_dll1 = "/."/input_file.filename();
 	boost::filesystem::path known_dll2 = "."/input_file.filename();
 	if(has_node(known_dll1)){ 
-		//std::cout << "KNOWN DLL1!\n";
 		mapping_[input_file] = mapping_[known_dll1];
-		mapping_.erase(known_dll1);//::Key = input_file;
-		//std::cout << "avant VERTEX: " << boost::get(boost::vertex_name_t(), graph_)[mapping_[input_file]] << std::endl;
+		mapping_.erase(known_dll1);
 		boost::put(boost::vertex_name_t(), graph_, mapping_[input_file], input_file);
 		boost::put(boost::vertex_hash_t(), graph_, mapping_[input_file], input_hash);
-		//std::cout << "apres VERTEX: " << boost::get(boost::vertex_name_t(), graph_)[mapping_[input_file]] << std::endl;
 		return input_file;
-		//map_p_->first = input_file;
 	}else if(has_node(known_dll2)){
-		//std::cout << "KNOWN DLL2!\n";
 		mapping_[input_file] = mapping_[known_dll2];
-		mapping_.erase(known_dll1);//::Key = input_file;
-		//std::cout << "avant VERTEX: " << boost::get(boost::vertex_name_t(), graph_)[mapping_[input_file]] << std::endl;
+		mapping_.erase(known_dll1);
 		boost::put(boost::vertex_name_t(), graph_, mapping_[input_file], input_file);
 		boost::put(boost::vertex_hash_t(), graph_, mapping_[input_file], input_hash);
-		//std::cout << "apres VERTEX: " << boost::get(boost::vertex_name_t(), graph_)[mapping_[input_file]] << std::endl;
 		return input_file;
 	}
     }

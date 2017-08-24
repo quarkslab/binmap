@@ -55,9 +55,7 @@ class Graph {
   mapping_;
   mutable std::vector<int> *distance_matrix_;
 
-/********************AJOUT PAR MOI*********************/
   boost::unordered_map<boost::filesystem::path, int> passed_path_;
-  boost::unordered_map<boost::filesystem::path, int>::iterator it_p_;
   boost::unordered_map<boost::filesystem::path, graph_type::vertex_descriptor>::iterator
 	map_p_;
 
