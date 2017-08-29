@@ -55,9 +55,7 @@ class Graph {
   mapping_;
   mutable std::vector<int> *distance_matrix_;
 
-  boost::unordered_map<boost::filesystem::path, int> passed_path_;
-  boost::unordered_map<boost::filesystem::path, graph_type::vertex_descriptor>::iterator
-	map_p_;
+  boost::unordered_map<boost::filesystem::path, int> visited_path_;
 
 public:
   Graph();
@@ -141,9 +139,7 @@ template <class T> class GraphProjection {
 
   graph_type graph_;
   boost::unordered_map<T, typename graph_type::vertex_descriptor> mapping_;
-
-/**********************AJOUTE PAR MOI***************/
-  boost::unordered_map<T, typename boost::filesystem::path> passed_path_;
+  boost::unordered_map<T, typename boost::filesystem::path> visited_path_;
 
 public:
   typedef typename boost::graph_traits<graph_type>::vertex_iterator

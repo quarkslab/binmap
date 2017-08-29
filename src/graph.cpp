@@ -148,8 +148,8 @@ boost::filesystem::path Graph::add_node(boost::filesystem::path const &input_fil
                      Hash const &input_hash) {
   if(not has_node(input_file)){
 
-    if (passed_path_.find(input_file.parent_path()) == passed_path_.end()){ //path not parsed yet
-	passed_path_[input_file.parent_path()] = 1;
+    if (visited_path_.find(input_file.parent_path()) == visited_path_.end()){ //path not parsed yet
+	visited_path_[input_file.parent_path()] = 1;
     }
 
 
@@ -160,7 +160,7 @@ boost::filesystem::path Graph::add_node(boost::filesystem::path const &input_fil
     if(input_file.parent_path() == no_path1 || input_file.parent_path() == no_path2){
 	boost::unordered_map<boost::filesystem::path, int>::iterator it_p_;
 
-	for (it_p_=passed_path_.begin(); it_p_!=passed_path_.end();it_p_++){
+	for (it_p_=visited_path_.begin(); it_p_!=visited_path_.end();it_p_++){
 		if(it_p_->first != no_path1 && 
 		   it_p_->first != no_path2 &&
 		   has_node(it_p_->first / input_file.filename())){

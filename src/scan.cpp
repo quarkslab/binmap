@@ -192,7 +192,6 @@ private:
   boost::filesystem::path
   add_node(boost::filesystem::path const &input_file,
                             Hash const &input_hash) {
-    //logging::log(logging::warning) << "\nadding file: " << input_file<<"\n";
     boost::filesystem::path const trimed_input_file = trim_root(input_file);
     Graph &graph = current_graph();
     boost::filesystem::path to_add = graph.add_node(trimed_input_file, input_hash);
@@ -224,7 +223,6 @@ private:
     
     std::string const& spath = path_low.string();
     // only trim root if root is a prefix
-    //std::cout << "\nspath: " << spath << " root: " << root << " path " << path << "\n";
     if (root.size() < spath.size()
         and std::equal(root.begin(), root.end(), spath.begin()))
       return spath.c_str() + Env::root().string().size();

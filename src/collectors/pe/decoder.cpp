@@ -501,7 +501,6 @@ bool pe_decoder<_Bits>::parse_manifest(std::map<std::string, boost::filesystem::
         return false;
     }
 
-    // char* buff to std::istream
     std::string str_xml(buffer, data_entry.Size);
     delete [] buffer;
     std::istringstream stream(str_xml);
@@ -665,9 +664,8 @@ bool pe_decoder<_Bits>::get_imported_symbols(boost::filesystem::path const &modu
         imp_off += sizeof(imp_desc);
 
 /****************************************************
-Il faut ajouter aux imported_symbols au fur et à mesure :
 PeImportDescriptor _imp_dep;
-_imp_dep.FirstThunk => rva to offset => rva to offset bis => passer deux char + read
+_imp_dep.FirstThunk => rva to offset => rva to offset bis => skip 2 char + read
 ***************************************************/
 	uint32_t thunk_off;
 	if(imp_desc.OriginalFirstThunk==0){
@@ -715,9 +713,7 @@ _imp_dep.FirstThunk => rva to offset => rva to offset bis => passer deux char + 
 			break;
 		}
 		
-		//printf("step: %d\nfunc_rva: %08x, %llx\n", step, func_rva, func_rva);
 		if (!convert_rva_to_offset64(func_rva, func_off)){
-			//logging::log(logging::error) << "ERROR : pe_decoder: couldn't convert function rva to offset (imported_symbols)"<< std::endl;
 			logging::log(logging::info) << "Imported : N/A\n";
 			bad_convert=true;
 		}
@@ -740,35 +736,10 @@ _imp_dep.FirstThunk => rva to offset => rva to offset bis => passer deux char + 
 		bad_convert=false;
 	}
 
-
-/********************************************/
     } while (::memcmp(&imp_desc, &imp_end, sizeof(PeImportDescriptor)));
 	logging::log(logging::info) <<"out_imported_symbols\n";
 	return true;
 }
-
-/***********************************************************
-
-AJOUTÉ : PHASE DE TEST
-
-
-
-************************************************************/
-
-/*********************************************
-dans pe.hpp:
-struct PeImageDelayImport {
-	uint32_t dd_grAttrs;
-	uint32_t szName;
-	uint32_t phmod;
-	uint32_t pIAT;
-	uint32_t pINT;
-	uint32_t pBoundIAT;
-	uint32_t pUnloadIAT;
-	uint32_t dwTimeStamp;
-};
-*********************************************/
-
 
 template <typename _Bits>
 bool pe_decoder<_Bits>::get_delay_imports(const boost::filesystem::path  &module_path, std::vector<std::string> &imported_symbols) const
@@ -847,10 +818,6 @@ bool pe_decoder<_Bits>::get_delay_imports(const boost::filesystem::path  &module
 			func_rva += (func_buff[k]+0x100)%0x100 * (pow(0x100,k));
 		}
 
-		/*printf("pINT: %08x\n",pINT);
-		if(pINT==0x004b45f8){
-			printf("func_rva: %llx\n", func_rva);
-		}*/
 		if(func_rva !=0){
 
 			if (!convert_rva_to_offset64(func_rva, func_off)){
