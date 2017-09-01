@@ -62,7 +62,7 @@ void PECollector::operator()(std::set<boost::filesystem::path> &deps) {
 
 
 void PECollector::operator()(MetadataInfo &mi) {
-	// collect exported functions
+		// collect exported functions
 	std::vector<std::string> exports;
 	std::vector<std::string> imported_symbols;
 	std::vector<std::string> imported_symbols2;
