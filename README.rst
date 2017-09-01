@@ -56,7 +56,7 @@ You need Visual Studio installed & ready. Then:
 
 Then run something like the following::
 
-    $ cmake -DBoost_DEBUG=ON -G "Visual Studio 12" -DBoost_USE_STATIC_LIBS=ON -DBOOST_ROOT=D:\Programming\Libraries\boost_1_55_0 -DBOOST_LIBRARYDIR=D:\Programming\Libraries\boost_1_55_0\lib32-msvc-12.0 -DZLIB_LIBRARY=D:\Programming\Libraries\zlib-1.2.8 -DZLIB_INCLUDE_DIR=D:\Programming\Libraries\zlib-1.2.8
+    ./binmap-master/_build> cmake -DBoost_DEBUG=ON -G "Visual Studio 12" -DBoost_USE_STATIC_LIBS=ON -DBOOST_ROOT=C:\local\boost_1_56_0 -DBOOST_LIBRARYDIR=C:\local\boost_1_56_0\lib32-msvc-12.0 -DZLIB_LIBRARY="C:\Program Files (x86)\zlib" -DZLIB_INCLUDE_DIR="C:\Program Files(x86)\zlib\include" -DPYTHON_INCLUDE_DIR="C:\Python27\include" -DPYTHON_LIBRARY="C:\Python27" ..
 
 
 Usage
