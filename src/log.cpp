@@ -29,7 +29,15 @@ static std::ostream cnull(0);
 std::ostream &Log::operator()(verbosity_level lvl) {
   if (lvl > current_level_)
     return cnull;
-  else
-    return std::clog;
+  else {
+    switch(lvl) {
+      case error:
+        return std::clog << "[ERROR] ";
+      case warning:
+        return std::clog << "[WARN] ";
+      case info:
+        return std::clog << "[INFO] ";
+    }
+  }
 }
 }
