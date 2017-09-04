@@ -195,8 +195,8 @@ private:
     boost::filesystem::path const trimed_input_file = trim_root(input_file);
     Graph &graph = current_graph();
     boost::filesystem::path to_add = graph.add_node(trimed_input_file, input_hash);
-    logging::log(logging::warning) << "\nadding file: " << to_add << " "
-                                << input_hash <<""<< std::endl;
+    logging::log(logging::warning) << "adding file: " << to_add << " "
+                                << input_hash << std::endl;
     return to_add;
   }
 

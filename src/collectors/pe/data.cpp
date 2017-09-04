@@ -128,10 +128,6 @@ template <typename _Bits>
 bool PeData<_Bits>::convert_rva_to_offset64(uint64_t rva,
     uint64_t &offset) const {
 
-    if (_sections.empty()){
-        return false;
-    }
-
     PeSectionHeaderVector::const_iterator end = _sections.end();
     for (PeSectionHeaderVector::const_iterator it = _sections.begin(); it != end;
         ++it) {

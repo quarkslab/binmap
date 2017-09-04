@@ -311,18 +311,18 @@ void pe_decoder<_Bits>::get_imports(boost::filesystem::path const &module_path, 
         //names are case unsensitive on windows!
         std::transform(dll_name.begin(), dll_name.end(), dll_name.begin(), ::tolower);
 
-	boost::filesystem::path full_path;
+		boost::filesystem::path full_path;
         // try to resolve full module path
         if (!find_module_path(module_path, dll_name)){
-            logging::log(logging::warning) << "couldn't find full path for module " << dll_name
+			logging::log(logging::warning) << "couldn't find full path for module " << dll_name
                 << " imported by module " << module_path << std::endl;
-		full_path = Env::root() / "./" / dll_name;
-		logging::log(logging::warning) << "dll name:" << full_path << "\n";
+			full_path = Env::root() / "./" / dll_name;
+			logging::log(logging::warning) << "dll name:" << full_path <<  std::endl;
         }else{
 
         //push module into imports (even if we couldn't find its full path).
         	full_path = module_path;
-	}
+		}
         imports.insert(full_path);
 
 
@@ -332,7 +332,7 @@ void pe_decoder<_Bits>::get_imports(boost::filesystem::path const &module_path, 
 	uint32_t delay_imports_rva =
         _pe_data.nt_headers().OptionalHeader.DataDirectory[PeDataDirectory::kEntryDelayImport]
         .VirtualAddress;
-    uint32_t delay_imports_len =
+	uint32_t delay_imports_len =
         _pe_data.nt_headers().OptionalHeader.DataDirectory[PeDataDirectory::kEntryDelayImport]
         .Size;
 
@@ -367,7 +367,7 @@ void pe_decoder<_Bits>::get_imports(boost::filesystem::path const &module_path, 
 	if (!_pe_data.read_line(name_off, dep_name)){
 	    //continue;
 	}else{
-		logging::log(logging::info) << "find delay_import dependencie: " << dep_name <<"\n";
+		logging::log(logging::info) << "find delay_import dependencie: " << dep_name << std::endl;
 	}
 
 
@@ -379,13 +379,13 @@ void pe_decoder<_Bits>::get_imports(boost::filesystem::path const &module_path, 
         if (!find_module_path(module_path, dep_name)){
             logging::log(logging::warning) << "couldn't find full path for module " << dep_name
                 << " imported by module " << module_path << std::endl;
-		full_path = Env::root() / "./" / dep_name;
-		logging::log(logging::warning) << "dll name:" << full_path << "\n";
+			full_path = Env::root() / "./" / dep_name;
+			logging::log(logging::warning) << "dll name:" << full_path <<  std::endl;
         }else{
 
         //push module into imports (even if we couldn't find its full path).
         	full_path = module_path;// Env::root() / dll_name;
-	}
+		}
         imports.insert(full_path);
 
 	delay_imports_off += sizeof(PeImageDelayImport);
@@ -615,7 +615,7 @@ bool pe_decoder<_Bits>::find_module_path(boost::filesystem::path const &containi
 
 template <typename _Bits>
 bool pe_decoder<_Bits>::get_imported_symbols(boost::filesystem::path const &module_path, std::vector<std::string> &imported_symbols) const {
-	logging::log(logging::info) <<"start_imported_symbols\n";
+	logging::log(logging::info) <<"start_imported_symbols" << std::endl;
     uint32_t imp_rva =
        _pe_data.nt_headers().OptionalHeader.DataDirectory[PeDataDirectory::kEntryImport]
         .VirtualAddress;
@@ -633,7 +633,7 @@ bool pe_decoder<_Bits>::get_imported_symbols(boost::filesystem::path const &modu
         {
             std::string empty;
             find_module_path(module_path, empty);
-	    logging::log(logging::warning) << "Apisetschema redirection scheme\n";
+	    	logging::log(logging::warning) << "Apisetschema redirection scheme" << std::endl;
             return false;
         }
         else{
@@ -669,11 +669,10 @@ _imp_dep.FirstThunk => rva to offset => rva to offset bis => skip 2 char + read
 ***************************************************/
 	uint32_t thunk_off;
 	if(imp_desc.OriginalFirstThunk==0){
-		logging::log(logging::info) <<"out_imported_symbols\n";
+		logging::log(logging::info) <<"out_imported_symbols" << std::endl;
 		return true;
 	}
 	if (!convert_rva_to_offset(imp_desc.OriginalFirstThunk, thunk_off)){
-		printf("FirstThunk rva : %08x\n", imp_desc.OriginalFirstThunk);
 		logging::log(logging::error) << "pe_decoder: couldn't convert import FirstThunk rva to offset"<< std::endl;
 		return false;
 	}
@@ -709,12 +708,12 @@ _imp_dep.FirstThunk => rva to offset => rva to offset bis => skip 2 char + read
 		}
 
 		if(func_rva ==0){
-			logging::log(logging::info) << "func_rva=0\n";
+			logging::log(logging::info) << "func_rva=0" << std::endl;
 			break;
 		}
 		
 		if (!convert_rva_to_offset64(func_rva, func_off)){
-			logging::log(logging::info) << "Imported : N/A\n";
+			logging::log(logging::info) << "Imported : N/A" << std::endl;
 			bad_convert=true;
 		}
 	
@@ -728,7 +727,7 @@ _imp_dep.FirstThunk => rva to offset => rva to offset bis => skip 2 char + read
 			    	continue;
 			}else{
 
-				logging::log(logging::info) << "find imported symbol: " << func_name <<"\n";
+				logging::log(logging::info) << "find imported symbol: " << func_name << std::endl;
 				imported_symbols.push_back(func_name);
 			}
 		}
@@ -737,14 +736,14 @@ _imp_dep.FirstThunk => rva to offset => rva to offset bis => skip 2 char + read
 	}
 
     } while (::memcmp(&imp_desc, &imp_end, sizeof(PeImportDescriptor)));
-	logging::log(logging::info) <<"out_imported_symbols\n";
+	logging::log(logging::info) <<"out_imported_symbols" << std::endl;
 	return true;
 }
 
 template <typename _Bits>
 bool pe_decoder<_Bits>::get_delay_imports(const boost::filesystem::path  &module_path, std::vector<std::string> &imported_symbols) const
 {
-	logging::log(logging::info) <<"start_delay_imports\n";
+	logging::log(logging::info) <<"start_delay_imports" << std::endl;
     uint32_t delay_imports_rva =
         _pe_data.nt_headers().OptionalHeader.DataDirectory[PeDataDirectory::kEntryDelayImport]
         .VirtualAddress;
@@ -753,7 +752,7 @@ bool pe_decoder<_Bits>::get_delay_imports(const boost::filesystem::path  &module
         .Size;
 
     if (delay_imports_rva == 0 || delay_imports_len == 0){
-	logging::log(logging::info) <<"no_delay_import: out\n";
+	logging::log(logging::info) <<"no_delay_import: out" << std::endl;
         return false;
     }
 
@@ -774,7 +773,7 @@ bool pe_decoder<_Bits>::get_delay_imports(const boost::filesystem::path  &module
 	}
 
 	if(delay_imports_dir.szName == 0){
-		logging::log(logging::info) <<"out_delay_imports: name_off = 0\n";
+		logging::log(logging::info) <<"out_delay_imports: name_off = 0" << std::endl;
 		return true;
 	}
 
@@ -787,7 +786,7 @@ bool pe_decoder<_Bits>::get_delay_imports(const boost::filesystem::path  &module
 	if (!_pe_data.read_line(name_off, dep_name)){
 	    //continue;
 	}else{
-		logging::log(logging::info) << "find delay_import dependencie: " << dep_name <<"\n";
+		logging::log(logging::info) << "find delay_import dependencie: " << dep_name << std::endl;
 	}
 
 	uint64_t func_rva=1;
@@ -832,14 +831,14 @@ bool pe_decoder<_Bits>::get_delay_imports(const boost::filesystem::path  &module
 					//continue;
 				}else{
 
-					logging::log(logging::info) << "find imported function (delay_load): " << func_name <<"\n";
+					logging::log(logging::info) << "find imported function (delay_load): " << func_name << std::endl;
 					imported_symbols.push_back(func_name);
 				}
 			}
 		}
 		pINT += step;
 	}
-	logging::log(logging::info) <<"out_delay_imports\n";
+	logging::log(logging::info) <<"out_delay_imports" << std::endl;
 	delay_imports_off += sizeof(PeImageDelayImport);
     }
     return true;
