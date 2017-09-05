@@ -74,6 +74,12 @@ public:
   bool has_path(boost::filesystem::path const &from,
                 boost::filesystem::path const &to) const;
 
+/**
+*	if `input_file` is not found in the binary folder but has been parsed before
+*		=> return path parsed before
+*	if `input_file` is found but hasn't been found before
+*		=> return `input_file` (and change the node's name)
+**/
   boost::filesystem::path add_node(boost::filesystem::path const &input_file,
                 Hash const &input_hash);
 
