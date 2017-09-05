@@ -123,6 +123,23 @@ bool PeData<_Bits>::convert_rva_to_offset(uint32_t rva,
     return false;
 }
 
+
+template <typename _Bits>
+bool PeData<_Bits>::convert_rva_to_offset64(uint64_t rva,
+    uint64_t &offset) const {
+
+    PeSectionHeaderVector::const_iterator end = _sections.end();
+    for (PeSectionHeaderVector::const_iterator it = _sections.begin(); it != end;
+        ++it) {
+        if (rva >= it->VirtualAddress &&
+            rva < it->VirtualAddress + it->Misc.VirtualSize) {
+            offset = it->PointerToRawData + (rva - it->VirtualAddress);
+            return true;
+        }
+    }
+    return false;
+}
+
 template <typename _Bits>
 bool PeData<_Bits>::section_header_from_rva(uint32_t rva, PeSectionHeader &sec_header) const
 {

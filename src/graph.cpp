@@ -101,10 +101,19 @@ Graph::edge_end(graph_type::vertex_descriptor input) const {
 
 void Graph::add_edge(boost::filesystem::path const &from,
                      boost::filesystem::path const &to) {
+  boost::filesystem::path to_path = to;
   assert(has_node(from));
-  assert(has_node(to));
+  if(not has_node(to)){
+    to_path = add_node(to, (Hash)(to));
+    assert(has_node(to_path));
+  }
+  
+
 #pragma omp critical(graph_)
-  boost::add_edge(mapping_[from], mapping_[to], graph_);
+  
+  if(from != to_path){ 
+    boost::add_edge(mapping_[from], mapping_[to_path], graph_);
+  }
 }
 
 void Graph::dot(boost::filesystem::path const &path) const {
@@ -135,17 +144,57 @@ void Graph::compute_distance_matrix() const {
   }
 }
 
-void Graph::add_node(boost::filesystem::path const &input_file,
+boost::filesystem::path Graph::add_node(boost::filesystem::path const &input_file,
                      Hash const &input_hash) {
-  assert(not has_node(input_file));
-#pragma omp critical(graph_)
-  {
+  if(not has_node(input_file)){
+
+    if (visited_path_.find(input_file.parent_path()) == visited_path_.end()){ //path not parsed yet
+	visited_path_.insert(input_file.parent_path());
+    }
+
+
+    boost::filesystem::path no_path1 = "/.";
+    boost::filesystem::path no_path2 = ".";
+    std::string file = input_file.string();
+
+    if(input_file.parent_path() == no_path1 || input_file.parent_path() == no_path2){
+	boost::unordered_set<boost::filesystem::path>::iterator it_p_;
+
+	for (it_p_=visited_path_.begin(); it_p_!=visited_path_.end();it_p_++){
+		if(*it_p_ != no_path1 && 
+		   *it_p_ != no_path2 &&
+		   has_node(*it_p_ / input_file.filename())){
+			return (*it_p_ / input_file.filename());
+		}
+	}
+    }else{
+	boost::filesystem::path known_dll1 = "/."/input_file.filename();
+	boost::filesystem::path known_dll2 = "."/input_file.filename();
+	if(has_node(known_dll1)){ 
+		mapping_[input_file] = mapping_[known_dll1];
+		mapping_.erase(known_dll1);
+		boost::put(boost::vertex_name_t(), graph_, mapping_[input_file], input_file);
+		boost::put(boost::vertex_hash_t(), graph_, mapping_[input_file], input_hash);
+		return input_file;
+	}else if(has_node(known_dll2)){
+		mapping_[input_file] = mapping_[known_dll2];
+		mapping_.erase(known_dll1);
+		boost::put(boost::vertex_name_t(), graph_, mapping_[input_file], input_file);
+		boost::put(boost::vertex_hash_t(), graph_, mapping_[input_file], input_hash);
+		return input_file;
+	}
+    }
+
+
     graph_type::vertex_descriptor v = boost::add_vertex(graph_);
     mapping_[input_file] = v;
 
     boost::put(boost::vertex_name_t(), graph_, v, input_file);
     boost::put(boost::vertex_hash_t(), graph_, v, input_hash);
   }
+  return input_file;
 }
+
+
 
 size_t Graph::size() const { return boost::num_vertices(graph_); }

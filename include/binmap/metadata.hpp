@@ -89,6 +89,8 @@ public:
 
   boost::unordered_set<std::string> const &imported_symbols() const;
   void add_imported_symbol(std::string const &value);
+  template <class Iterator>
+  void add_imported_symbols(Iterator begin, Iterator end);
 
   boost::unordered_set<hardening_feature_t> const &hardening_features() const;
   void add_hardening_feature(hardening_feature_t const &value);
@@ -134,5 +136,18 @@ inline void MetadataInfo::add_exported_symbols(Iterator begin, Iterator end)
   for(; begin != end; ++begin)
     add_exported_symbol(*begin);
 }
+
+
+template<class Iterator>
+inline void MetadataInfo::add_imported_symbols(Iterator begin, Iterator end)
+{
+  for(; begin != end; ++begin)
+    add_imported_symbol(*begin);
+
+}
+
+
+
+
 
 #endif
