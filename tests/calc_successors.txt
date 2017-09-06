@@ -1,6 +1,6 @@
-/advapi32.dll
-/gdi32.dll
-/kernel32.dll
-/shell32.dll
-/user32.dll
-/msvcrt.dll
+/./advapi32.dll
+/./gdi32.dll
+/./kernel32.dll
+/./shell32.dll
+/./user32.dll
+/./msvcrt.dll
