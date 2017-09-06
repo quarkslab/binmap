@@ -45,6 +45,7 @@ public:
   void sections(const PeSectionHeaderVector &sections) { _sections = sections; }
 
   bool convert_rva_to_offset(uint32_t rva, uint32_t &offset) const;
+  bool convert_rva_to_offset64(uint64_t rva, uint64_t &offset) const;
 
   bool section_header_from_rva(uint32_t rva, PeSectionHeader &offset) const;
 

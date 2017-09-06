@@ -47,6 +47,11 @@ struct PEDecoder {
 
   virtual bool get_exports(boost::filesystem::path const &module_path,
                            std::vector<std::string> &exports) const = 0;
+  virtual bool get_delay_imports(boost::filesystem::path const &module_path,
+				std::vector<std::string> &imported_symbols) const =0;
+
+  virtual bool get_imported_symbols(boost::filesystem::path const &module_path,
+                           	    std::vector<std::string> &imported_symbols) const = 0;
 
   virtual void extract_hardening_features(MetadataInfo&) const = 0;
 
@@ -69,10 +74,16 @@ public:
   bool is_compatible(void) const;
   uint16_t machine_type(void) const;
   bool convert_rva_to_offset(uint32_t rva, uint32_t &offset) const;
+  bool convert_rva_to_offset64(uint64_t rva, uint64_t &offset) const;
   void get_imports(boost::filesystem::path const &module_path,
                    std::set<boost::filesystem::path> &imports) const;
   bool get_exports(boost::filesystem::path const &module_path,
                    std::vector<std::string> &exports) const;
+  bool get_imported_symbols(boost::filesystem::path const &module_path,
+                  	    std::vector<std::string> &imported_symbols) const;
+
+  bool get_delay_imports(boost::filesystem::path const &module_path,
+		   std::vector<std::string> &imported_symbols) const;
   void extract_hardening_features(MetadataInfo& mi) const;
   PeNtHeaders const nt_headers(void) const;
   std::vector<PeSectionHeader> const &sections(void) const;

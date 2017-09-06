@@ -5,7 +5,7 @@
 //   you may not use this file except in compliance with the License.
 //   You may obtain a copy of the License at
 //
-//       http://www.apache.org/licenses/LICENSE-2.0
+//	   http://www.apache.org/licenses/LICENSE-2.0
 //
 //   Unless required by applicable law or agreed to in writing, software
 //   distributed under the License is distributed on an "AS IS" BASIS,
@@ -34,6 +34,7 @@
 
 #include <boost/foreach.hpp>
 #include <boost/algorithm/string/predicate.hpp>
+#include <boost/algorithm/string/join.hpp>
 #include <boost/filesystem/operations.hpp>
 
 /**
@@ -45,14 +46,14 @@
 */
 PEDecoder* PeDecoderFactory(boost::filesystem::path const &path, bool full_parsing){
 
-    std::ifstream file(path.string().c_str(), std::ios_base::binary);
-    if (!file){
-        throw std::runtime_error("couldn't open required PE file.");
-    }
+	std::ifstream file(path.string().c_str(), std::ios_base::binary);
+	if (!file){
+		throw std::runtime_error("couldn't open required PE file.");
+	}
 
-    PEDecoder* pe = PeDecoderFactory(file, full_parsing);
+	PEDecoder* pe = PeDecoderFactory(file, full_parsing);
 
-    return pe;
+	return pe;
 }
 
 /**
@@ -63,23 +64,23 @@ PEDecoder* PeDecoderFactory(boost::filesystem::path const &path, bool full_parsi
 * \return Pointer to an instance of the class PEDecoder.
 */
 PEDecoder* PeDecoderFactory(std::ifstream& file, bool full_parsing){
-    uint16_t machine = PEDecoder::machine_type(file);
+	uint16_t machine = PEDecoder::machine_type(file);
 
-    PEDecoder* pe;
-    switch (machine) {
-    case PeFileHeader::kMachineI386:
-        pe = new pe_decoder<uint32_t>(file, full_parsing);
-        break;
+	PEDecoder* pe;
+	switch (machine) {
+	case PeFileHeader::kMachineI386:
+		pe = new pe_decoder<uint32_t>(file, full_parsing);
+		break;
 
-    case PeFileHeader::kMachineAmd64:
-        pe = new pe_decoder<uint64_t>(file, full_parsing);
-        break;
+	case PeFileHeader::kMachineAmd64:
+		pe = new pe_decoder<uint64_t>(file, full_parsing);
+		break;
 
-    default:
-        return 0;
-    }
+	default:
+		return 0;
+	}
 
-    return pe;
+	return pe;
 }
 
 /**
@@ -89,18 +90,18 @@ PEDecoder* PeDecoderFactory(std::ifstream& file, bool full_parsing){
 * \return The machine type (as from IMAGE_FILE_HEADER::File).
 */
 uint16_t PEDecoder::machine_type(std::ifstream& file){
-    PeDosHeader dos;
-    file.read(reinterpret_cast<char*>(&dos), sizeof(dos));
+	PeDosHeader dos;
+	file.read(reinterpret_cast<char*>(&dos), sizeof(dos));
 
-    uint16_t machine;
-    file.seekg(dos.e_lfanew + sizeof(uint32_t /*PeFileHeader::Signature*/), std::ios_base::beg);
+	uint16_t machine;
+	file.seekg(dos.e_lfanew + sizeof(uint32_t /*PeFileHeader::Signature*/), std::ios_base::beg);
 
-    if (!file.read(reinterpret_cast<char*>(&machine), sizeof(machine)))
-        throw std::runtime_error("invalid PE");
+	if (!file.read(reinterpret_cast<char*>(&machine), sizeof(machine)))
+		throw std::runtime_error("invalid PE");
 
-    file.seekg(0, std::ios_base::beg);
+	file.seekg(0, std::ios_base::beg);
 
-    return machine;
+	return machine;
 }
 
 /**
@@ -111,56 +112,56 @@ uint16_t PEDecoder::machine_type(std::ifstream& file){
 */
 template <typename _Bits>
 pe_decoder<_Bits>::pe_decoder(std::ifstream &file, bool full_parsing)
-    : _pe_data(file), _file(file), _is_compatible(false)
+	: _pe_data(file), _file(file), _is_compatible(false)
 {
-    // read IMAGE_DOS_HEADER
-    PeDosHeader dos;
-    if (!_pe_data.read(0, sizeof(PeDosHeader), reinterpret_cast<char*>(&dos))){
-        throw std::runtime_error("pe_decoder::ctor: coudl'nt read dos header.");
-    }
-    if (!dos.is_valid()){
-        throw std::runtime_error("pe_decoder::ctor: dos header not valid.");
-    }
-    _pe_data.dos_header(dos);
+	// read IMAGE_DOS_HEADER
+	PeDosHeader dos;
+	if (!_pe_data.read(0, sizeof(PeDosHeader), reinterpret_cast<char*>(&dos))){
+		throw std::runtime_error("pe_decoder::ctor: coudl'nt read dos header.");
+	}
+	if (!dos.is_valid()){
+		throw std::runtime_error("pe_decoder::ctor: dos header not valid.");
+	}
+	_pe_data.dos_header(dos);
 
-    // read IMAGE_NT_HEADERS (support PE/PE+)
-    PeNtHeaders nt_headers;
-    if (!_pe_data.read(dos.e_lfanew, sizeof(nt_headers), reinterpret_cast<char*>(&nt_headers))){
-        throw std::runtime_error("pe_decoder::ctor: couldn't read nt_headers");
-    }
-    if (!nt_headers.is_valid())
-        throw std::runtime_error("pe_decoder::ctor: nt_headers is not valid");
+	// read IMAGE_NT_HEADERS (support PE/PE+)
+	PeNtHeaders nt_headers;
+	if (!_pe_data.read(dos.e_lfanew, sizeof(nt_headers), reinterpret_cast<char*>(&nt_headers))){
+		throw std::runtime_error("pe_decoder::ctor: couldn't read nt_headers");
+	}
+	if (!nt_headers.is_valid())
+		throw std::runtime_error("pe_decoder::ctor: nt_headers is not valid");
 
-    _pe_data.nt_headers(nt_headers);
+	_pe_data.nt_headers(nt_headers);
 
-    _machine_type = nt_headers.FileHeader.Machine;
+	_machine_type = nt_headers.FileHeader.Machine;
 
-    // read all IMAGE_SECTION_HEADER
-    PeSectionHeaderVector sections;
+	// read all IMAGE_SECTION_HEADER
+	PeSectionHeaderVector sections;
 
-    uint16_t scn_no = nt_headers.FileHeader.NumberOfSections;
-    sections.reserve(scn_no);
-    uint64_t scn_off = dos.e_lfanew +
-        offsetof(PeNtHeaders, FileHeader.SizeOfOptionalHeader) + 4 + // +4 for uint32_t Signature?
-        nt_headers.FileHeader.SizeOfOptionalHeader;
+	uint16_t scn_no = nt_headers.FileHeader.NumberOfSections;
+	sections.reserve(scn_no);
+	uint64_t scn_off = dos.e_lfanew +
+		offsetof(PeNtHeaders, FileHeader.SizeOfOptionalHeader) + 4 + // +4 for uint32_t Signature?
+		nt_headers.FileHeader.SizeOfOptionalHeader;
 
-    for (uint16_t scn_idx = 0; scn_idx < scn_no; ++scn_idx) {
-        PeSectionHeader scn_hdr;
-        if (!_pe_data.read(static_cast<uint32_t>(scn_off + scn_idx * sizeof(scn_hdr)),
-            sizeof(scn_hdr),
-            reinterpret_cast<char*>(&scn_hdr))){
-            throw std::runtime_error("pe_decoder::ctor: couldn't read section header.");
-        }
-        sections.push_back(scn_hdr);
-    }
+	for (uint16_t scn_idx = 0; scn_idx < scn_no; ++scn_idx) {
+		PeSectionHeader scn_hdr;
+		if (!_pe_data.read(static_cast<uint32_t>(scn_off + scn_idx * sizeof(scn_hdr)),
+			sizeof(scn_hdr),
+			reinterpret_cast<char*>(&scn_hdr))){
+			throw std::runtime_error("pe_decoder::ctor: couldn't read section header.");
+		}
+		sections.push_back(scn_hdr);
+	}
 
-    _pe_data.sections(sections);
+	_pe_data.sections(sections);
 
-    if (full_parsing){
-        parse_manifest(_assembly_maps);
-    }
+	if (full_parsing){
+		parse_manifest(_assembly_maps);
+	}
 
-    _is_compatible = true;
+	_is_compatible = true;
 }
 
 /**
@@ -168,7 +169,7 @@ pe_decoder<_Bits>::pe_decoder(std::ifstream &file, bool full_parsing)
 */
 template <typename _Bits>
 const PeNtHeadersTraits<_Bits> pe_decoder<_Bits>::nt_headers(void) const {
-    return _pe_data.nt_headers();
+	return _pe_data.nt_headers();
 }
 
 /**
@@ -176,7 +177,7 @@ const PeNtHeadersTraits<_Bits> pe_decoder<_Bits>::nt_headers(void) const {
 */
 template <typename _Bits>
 const std::vector<PeSectionHeader>& pe_decoder<_Bits>::sections(void) const {
-    return _pe_data.sections();
+	return _pe_data.sections();
 }
 
 /**
@@ -185,12 +186,12 @@ const std::vector<PeSectionHeader>& pe_decoder<_Bits>::sections(void) const {
 */
 template <typename _Bits>
 bool pe_decoder<_Bits>::is_compatible(void) const {
-    return _is_compatible;
+	return _is_compatible;
 }
 
 template <typename _Bits>
 uint16_t pe_decoder<_Bits>::machine_type(void) const{
-    return _machine_type;
+	return _machine_type;
 }
 
 /**
@@ -201,30 +202,30 @@ uint16_t pe_decoder<_Bits>::machine_type(void) const{
 */
 template <typename _Bits>
 char* pe_decoder<_Bits>::get_section(PeDataDirectory::image_directory_entry_t entry) const{
-    uint32_t sec_rva = _pe_data.nt_headers().OptionalHeader.DataDirectory[entry].VirtualAddress;
-    uint32_t sec_len = _pe_data.nt_headers().OptionalHeader.DataDirectory[entry].Size;
+	uint32_t sec_rva = _pe_data.nt_headers().OptionalHeader.DataDirectory[entry].VirtualAddress;
+	uint32_t sec_len = _pe_data.nt_headers().OptionalHeader.DataDirectory[entry].Size;
 
-    if (sec_rva == 0 || sec_len == 0){
-        return 0;
-    }
+	if (sec_rva == 0 || sec_len == 0){
+		return 0;
+	}
 
-    uint32_t sec_off;
-    if (!convert_rva_to_offset(sec_rva, sec_off)){
-        return 0;
-    }
+	uint32_t sec_off;
+	if (!convert_rva_to_offset(sec_rva, sec_off)){
+		return 0;
+	}
 
 
-    char* buffer = new char[sec_len];
+	char* buffer = new char[sec_len];
 
-    _file.seekg(sec_off, std::ios_base::beg);
+	_file.seekg(sec_off, std::ios_base::beg);
 
-    if (!_file.read(buffer, sec_len)){
-        // critical error: can't read PE file...
-        delete[] buffer;
-        return 0;
-    }
+	if (!_file.read(buffer, sec_len)){
+		// critical error: can't read PE file...
+		delete[] buffer;
+		return 0;
+	}
 
-    return buffer;
+	return buffer;
 }
 
 /**
@@ -235,93 +236,165 @@ char* pe_decoder<_Bits>::get_section(PeDataDirectory::image_directory_entry_t en
 */
 template <typename _Bits>
 void pe_decoder<_Bits>::get_imports(boost::filesystem::path const &module_path, std::set<boost::filesystem::path> &imports) const {
-    uint32_t imp_rva =
-       _pe_data.nt_headers().OptionalHeader.DataDirectory[PeDataDirectory::kEntryImport]
-        .VirtualAddress;
-    uint32_t imp_len =
-        _pe_data.nt_headers().OptionalHeader.DataDirectory[PeDataDirectory::kEntryImport]
-        .Size;
+	uint32_t imp_rva =
+	   _pe_data.nt_headers().OptionalHeader.DataDirectory[PeDataDirectory::kEntryImport]
+		.VirtualAddress;
+	uint32_t imp_len =
+		_pe_data.nt_headers().OptionalHeader.DataDirectory[PeDataDirectory::kEntryImport]
+		.Size;
 
-    if (imp_rva == 0x0 || imp_len == 0x0)
-    {
-        //check if this module is part of the apisetschema redirection scheme
-        //    in this case there's no import table, we'll do the redirection statically.
-        std::string module_filename = module_path.filename().string();
-        if (boost::starts_with(module_filename, WINDOWS_APISETSCHEMA_API_START) ||
-            boost::starts_with(module_filename, WINDOWS_APISETSCHEMA_EXT_START))
-        {
-            std::string empty;
-            find_module_path(module_path, empty);
-            return;
-        }
-        else{
-            // not a redirection scheme and no import table...
-            // Note: do NOT throw, we might have modules that do not export anything!
-            logging::log(logging::error) << "module " << module_path << " has no import table." << std::endl;
-            return;
-        }
-    }
+	if (imp_rva == 0x0 || imp_len == 0x0)
+	{
+		//check if this module is part of the apisetschema redirection scheme
+		//	in this case there's no import table, we'll do the redirection statically.
+		std::string module_filename = module_path.filename().string();
+		if (boost::starts_with(module_filename, WINDOWS_APISETSCHEMA_API_START) ||
+			boost::starts_with(module_filename, WINDOWS_APISETSCHEMA_EXT_START))
+		{
+			std::string empty;
+			find_module_path(module_path, empty);
+			return;
+		}
+		else{
+			// not a redirection scheme and no import table...
+			// Note: do NOT throw, we might have modules that do not export anything!
+			logging::log(logging::error) << "module " << module_path << " has no import table." << std::endl;
+			return;
+		}
+	}
 
-    uint32_t imp_off;
-    if (!convert_rva_to_offset(imp_rva, imp_off))
-        throw std::runtime_error("pe_decoder: bad convert_rva_to_offset");
+	uint32_t imp_off;
+	if (!convert_rva_to_offset(imp_rva, imp_off))
+		throw std::runtime_error("pe_decoder: bad convert_rva_to_offset");
 
-    // set NULL import descriptor
-    uint32_t dll_name_off;
-    PeImportDescriptor imp_desc, imp_end;
-    ::memset(&imp_end, 0x0, sizeof(imp_end));
+	// set NULL import descriptor
+	uint32_t dll_name_off;
+	PeImportDescriptor imp_desc, imp_end;
+	::memset(&imp_end, 0x0, sizeof(imp_end));
 
-    do{
-        //read import descriptor
-        _file.seekg(imp_off, std::ios_base::beg);
-        if (!_file.read(reinterpret_cast<char*>(&imp_desc), sizeof(imp_desc))){
-            // critical error: can't read PE file...
-            throw std::runtime_error("pe_decoder: couldn't read import descriptor");
-        }
+	do{
+		//read import descriptor
+		_file.seekg(imp_off, std::ios_base::beg);
+		if (!_file.read(reinterpret_cast<char*>(&imp_desc), sizeof(imp_desc))){
+			// critical error: can't read PE file...
+			throw std::runtime_error("pe_decoder: couldn't read import descriptor");
+		}
 
-        imp_off += sizeof(imp_desc);
+		imp_off += sizeof(imp_desc);
 
-        if (!convert_rva_to_offset(imp_desc.Name, dll_name_off)){
-            //check if this is the NULL import descriptor
-            if (::memcmp(&imp_desc, &imp_end, sizeof(PeImportDescriptor)) == 0) {
-                // we parsed all import descriptors, we can break safely
-                break;
-            }
-            else{
-                //serious error : we should always be able to convert rva to offset
-                throw std::runtime_error("pe_decoder: couldn't convert import name rva to offset");
-            }
-        }
+		if (!convert_rva_to_offset(imp_desc.Name, dll_name_off)){
+			//check if this is the NULL import descriptor
+			if (::memcmp(&imp_desc, &imp_end, sizeof(PeImportDescriptor)) == 0) {
+				// we parsed all import descriptors, we can break safely
+				break;
+			}
+			else{
+				//serious error : we should always be able to convert rva to offset
+				throw std::runtime_error("pe_decoder: couldn't convert import name rva to offset");
+			}
+		}
 
-        std::string dll_name;
-        _file.seekg(dll_name_off, std::ios_base::beg);
-        if (!std::getline(_file, dll_name, '\0')){
-            logging::log(logging::error) << "couldn't read name offset for module " << module_path
-                << " at offset " << std::hex << dll_name_off << std::endl;
-            continue;
-        }
+		std::string dll_name;
+		_file.seekg(dll_name_off, std::ios_base::beg);
+		if (!std::getline(_file, dll_name, '\0')){
+			logging::log(logging::error) << "couldn't read name offset for module " << module_path
+				<< " at offset " << std::hex << dll_name_off << std::endl;
+			continue;
+		}
 
-        if (dll_name.empty()){
-            logging::log(logging::error) << "import name for module " << module_path
-                << " at offset " << std::hex << dll_name_off << " is empty." << std::endl;
-            continue;
-        }
+		if (dll_name.empty()){
+			logging::log(logging::error) << "import name for module " << module_path
+				<< " at offset " << std::hex << dll_name_off << " is empty." << std::endl;
+			continue;
+		}
 
-        //names are case unsensitive on windows!
-        std::transform(dll_name.begin(), dll_name.end(), dll_name.begin(), ::tolower);
+		//names are case unsensitive on windows!
+		std::transform(dll_name.begin(), dll_name.end(), dll_name.begin(), ::tolower);
 
-        // try to resolve full module path
-        if (!find_module_path(module_path, dll_name)){
-            logging::log(logging::warning) << "couldn't find full path for module " << dll_name
-                << " imported by module " << module_path << std::endl;
-        }
+		boost::filesystem::path full_path;
+		// try to resolve full module path
+		if (!find_module_path(module_path, dll_name)){
+			logging::log(logging::warning) << "couldn't find full path for module " << dll_name
+				<< " imported by module " << module_path << std::endl;
+			full_path = Env::root() / "./" / dll_name;
+			logging::log(logging::warning) << "dll name:" << full_path <<  std::endl;
+		}else{
 
-        //push module into imports (even if we couldn't find its full path).
-        boost::filesystem::path full_path = Env::root() / dll_name;
-        imports.insert(full_path);
+		//push module into imports (even if we couldn't find its full path).
+			full_path = module_path;
+		}
+		imports.insert(full_path);
 
-    } while (::memcmp(&imp_desc, &imp_end, sizeof(PeImportDescriptor)));
+
+	} while (::memcmp(&imp_desc, &imp_end, sizeof(PeImportDescriptor)));
+
+
+	uint32_t delay_imports_rva =
+		_pe_data.nt_headers().OptionalHeader.DataDirectory[PeDataDirectory::kEntryDelayImport]
+		.VirtualAddress;
+	uint32_t delay_imports_len =
+		_pe_data.nt_headers().OptionalHeader.DataDirectory[PeDataDirectory::kEntryDelayImport]
+		.Size;
+
+	if (delay_imports_rva == 0 || delay_imports_len == 0){
+		return;
+	}
+
+	uint32_t delay_imports_off;
+	if (!convert_rva_to_offset(delay_imports_rva, delay_imports_off))
+		throw std::runtime_error("pe_decoder::get_delay_imports: bad convert_rva_to_offset");
+
+
+	int step = sizeof(_pe_data.nt_headers().OptionalHeader.ImageBase);
+	uint32_t name_off=1;
+	while(name_off!=0){
+	name_off=0;
+	PeImageDelayImport delay_imports_dir;
+	if (!_pe_data.read(delay_imports_off, sizeof(PeImageDelayImport), reinterpret_cast<char*>(&delay_imports_dir))) {
+		throw std::runtime_error("pe_decoder::get_delay_imports: couldn't read delay_imports directory");
+	}
+
+	if(delay_imports_dir.szName == 0){
+		return;
+	}
+
+	if (!convert_rva_to_offset(delay_imports_dir.szName, name_off)){
+		return;
+	}
+
+	//TODO : associate name + ordinal + func pointer !
+	std::string dep_name;
+	if (!_pe_data.read_line(name_off, dep_name)){
+		//continue;
+	}else{
+		logging::log(logging::info) << "find delay_import dependencie: " << dep_name << std::endl;
+	}
+
+
+	std::transform(dep_name.begin(), dep_name.end(), dep_name.begin(), ::tolower);
+
+
+	boost::filesystem::path full_path;
+		// try to resolve full module path
+		if (!find_module_path(module_path, dep_name)){
+			logging::log(logging::warning) << "couldn't find full path for module " << dep_name
+				<< " imported by module " << module_path << std::endl;
+			full_path = Env::root() / "./" / dep_name;
+			logging::log(logging::warning) << "dll name:" << full_path <<  std::endl;
+		}else{
+
+		//push module into imports (even if we couldn't find its full path).
+			full_path = module_path;// Env::root() / dll_name;
+		}
+		imports.insert(full_path);
+
+	delay_imports_off += sizeof(PeImageDelayImport);
+	}
 }
+
+
+
+
 
 /**
 * \brief Parse the resources.
@@ -332,130 +405,129 @@ void pe_decoder<_Bits>::get_imports(boost::filesystem::path const &module_path, 
 #include <iostream>
 template <typename _Bits>
 bool pe_decoder<_Bits>::parse_manifest(std::map<std::string, boost::filesystem::path>& assembly_maps) {
-    /* here comes the tedious parsing of the resource section...
-     --> We search for the RT_MANIFEST data content.
+	/* here comes the tedious parsing of the resource section...
+	 --> We search for the RT_MANIFEST data content.
 
-    The big picture goes like this:
-        - RDIR   = Resource Directory       (RDIR might have one or more RDIRE)
-        - RDIRE  = Resource Directory Entry (RDIRE points either to another RDIR or RDATAE)
-        - RDATAE = Resource Data Entry      (RDATAE points to data content: bytes that make the resource itself)
+	The big picture goes like this:
+		- RDIR   = Resource Directory	   (RDIR might have one or more RDIRE)
+		- RDIRE  = Resource Directory Entry (RDIRE points either to another RDIR or RDATAE)
+		- RDATAE = Resource Data Entry	  (RDATAE points to data content: bytes that make the resource itself)
 
-    (note: only RT_MANIFEST branch is unfolded)
+	(note: only RT_MANIFEST branch is unfolded)
 
-    *RDIR
-      |____ RDIRE Name 'FOO'
-      |____ RDIRE Name 'BLA'
-      |____ RDIRE ID 1
-      |____ ...
-      |____ RDIRE ID 24         // note: 24 = RT_MANIFEST
-            |_____ RDIR
-                    |_____ RDIRE ID 1
-                            |_____RDIR
-                                    |_____RDIRE ID 1033
-                                            |_____ RDATAE --(offset, size, codepage)--> (resource content)
+	*RDIR
+	  |____ RDIRE Name 'FOO'
+	  |____ RDIRE Name 'BLA'
+	  |____ RDIRE ID 1
+	  |____ ...
+	  |____ RDIRE ID 24		 // note: 24 = RT_MANIFEST
+			|_____ RDIR
+					|_____ RDIRE ID 1
+							|_____RDIR
+									|_____RDIRE ID 1033
+											|_____ RDATAE --(offset, size, codepage)--> (resource content)
 
-    The code starts  by getting the entry 24 (RT_MANFIEST) with parser.find_entry_by_id().
-    Once it's done, and if the entry is found, the code goes in an optimistic parsing:
-    The code searches only for the first entry (although there technically can be more than one
-    sub-entry and sub-sub-entry, etc.). In the above pic, this means that each RDIR (under 'RDIRE ID 24')
-    might possibly have more than one RDIRE although I haven't been able to find a single PE file with more
-    than one entry under the RT_MANIFEST entry, though.
-    */
-
-
-    ResourceParser<_Bits> parser (&_pe_data);
-
-    PeImageResourceDirectoryEntry manifest_entry;
-    //check if there is an entry for the manifest
-    if (!parser.find_entry_by_id(RT_MANIFEST, manifest_entry)){
-        return false;
-
-    }
-    // entry must be a "resource directory entry"
-    if (manifest_entry.data_type() != PeImageResourceDirectoryEntry::DataTypeIsDirectory){
-        logging::log(logging::warning) <<
-            "pe_decoder::parse_resources: RT_MANIFEST doesn't lead to directory."
-            << std::endl;
-        return false;
-    }
-
-    //get first sub entry for RT_MANIFEST
-    PeImageResourceDirectoryEntry sub_entry;
-    uint32_t num_entries;
-    if (!parser.get_first_dir_entry_from_dir_entry(manifest_entry, sub_entry, num_entries)){
-        logging::log(logging::error) <<
-            "pe_decoder::parse_resources: error getting sub-entry for RT_MANIFEST."
-            << std::endl;
-        return false;
-    }
-
-    //we might have missed other entries...
-    if (num_entries > 1){
-        logging::log(logging::warning) <<
-            "pe_decoder::parse_resources: more than one sub-entry for RT_MANIFEST."
-            << std::endl;
-    }
-
-    PeImageResourceDirectoryEntry sub_sub_entry;
-    if (!parser.get_first_dir_entry_from_dir_entry(sub_entry, sub_sub_entry, num_entries)){
-        logging::log(logging::error) <<
-            "pe_decoder::parse_resources: error getting sub-sub-entry for RT_MANIFEST."
-            << std::endl;
-        return false;
-    }
-
-    //we might have missed other entries...
-    if (num_entries > 1){
-        logging::log(logging::warning) <<
-            "pe_decoder::parse_resources: more than one sub-entry for RT_MANIFEST ???"
-            << std::endl;
-    }
-
-    PeImageResourceDataEntry data_entry;
-    if(!parser.get_data_entry_from_dir_entry(sub_sub_entry, data_entry)){
-        logging::log(logging::error) <<
-            "pe_decoder::parse_resources: could'nt get data entry from entry."
-            << std::endl;
-        return false;
-    }
-
-    //buffer is filled with the content of the manifestfile (XML file)
-    char* buffer;
-    if (!parser.get_data_from_data_entry(data_entry, &buffer)){
-        logging::log(logging::error) <<
-            "pe_decoder::parse_resources: couldn't get data from data entry."
-            << std::endl;
-        return false;
-    }
-
-    // char* buff to std::istream
-    std::string str_xml(buffer, data_entry.Size);
-    delete [] buffer;
-    std::istringstream stream(str_xml);
+	The code starts  by getting the entry 24 (RT_MANFIEST) with parser.find_entry_by_id().
+	Once it's done, and if the entry is found, the code goes in an optimistic parsing:
+	The code searches only for the first entry (although there technically can be more than one
+	sub-entry and sub-sub-entry, etc.). In the above pic, this means that each RDIR (under 'RDIRE ID 24')
+	might possibly have more than one RDIRE although I haven't been able to find a single PE file with more
+	than one entry under the RT_MANIFEST entry, though.
+	*/
 
 
-    //parse buffer: return AssemblyIdenty instances from the parsed XML
-    std::vector<AssemblyIdentity> asm_vec;
-    if (parser.parse_manifest(stream, asm_vec))
-    {
-        //for each AssemblyIdenty
-        boost::filesystem::path dir_path;
-        std::vector<boost::filesystem::path> file_cache;
-        BOOST_FOREACH(const AssemblyIdentity& asm_id, asm_vec){
-            //given an assemblyIdentity, return the corressponding WinSXS folder
-            if (parser.get_winsxs_directory_for_assembly(asm_id, dir_path, this->machine_type())){
-                // get file(s) inside this folder.
-                WindowsSharedLibraryLoader::fill_file_cache(dir_path, file_cache);
-                BOOST_FOREACH(const boost::filesystem::path &file, file_cache){
-                    //fill assembly map. Key is file name, value is full path with file name: [filename] = full_filename_path
-                    boost::filesystem::path const &filename = file.filename();
-                    assembly_maps[filename.string()] = dir_path / filename;
-                }
-            }
-        }
-    }
+	ResourceParser<_Bits> parser (&_pe_data);
 
-    return true;
+	PeImageResourceDirectoryEntry manifest_entry;
+	//check if there is an entry for the manifest
+	if (!parser.find_entry_by_id(RT_MANIFEST, manifest_entry)){
+		return false;
+
+	}
+	// entry must be a "resource directory entry"
+	if (manifest_entry.data_type() != PeImageResourceDirectoryEntry::DataTypeIsDirectory){
+		logging::log(logging::warning) <<
+			"pe_decoder::parse_resources: RT_MANIFEST doesn't lead to directory."
+			<< std::endl;
+		return false;
+	}
+
+	//get first sub entry for RT_MANIFEST
+	PeImageResourceDirectoryEntry sub_entry;
+	uint32_t num_entries;
+	if (!parser.get_first_dir_entry_from_dir_entry(manifest_entry, sub_entry, num_entries)){
+		logging::log(logging::error) <<
+			"pe_decoder::parse_resources: error getting sub-entry for RT_MANIFEST."
+			<< std::endl;
+		return false;
+	}
+
+	//we might have missed other entries...
+	if (num_entries > 1){
+		logging::log(logging::warning) <<
+			"pe_decoder::parse_resources: more than one sub-entry for RT_MANIFEST."
+			<< std::endl;
+	}
+
+	PeImageResourceDirectoryEntry sub_sub_entry;
+	if (!parser.get_first_dir_entry_from_dir_entry(sub_entry, sub_sub_entry, num_entries)){
+		logging::log(logging::error) <<
+			"pe_decoder::parse_resources: error getting sub-sub-entry for RT_MANIFEST."
+			<< std::endl;
+		return false;
+	}
+
+	//we might have missed other entries...
+	if (num_entries > 1){
+		logging::log(logging::warning) <<
+			"pe_decoder::parse_resources: more than one sub-entry for RT_MANIFEST ???"
+			<< std::endl;
+	}
+
+	PeImageResourceDataEntry data_entry;
+	if(!parser.get_data_entry_from_dir_entry(sub_sub_entry, data_entry)){
+		logging::log(logging::error) <<
+			"pe_decoder::parse_resources: could'nt get data entry from entry."
+			<< std::endl;
+		return false;
+	}
+
+	//buffer is filled with the content of the manifestfile (XML file)
+	char* buffer;
+	if (!parser.get_data_from_data_entry(data_entry, &buffer)){
+		logging::log(logging::error) <<
+			"pe_decoder::parse_resources: couldn't get data from data entry."
+			<< std::endl;
+		return false;
+	}
+
+	std::string str_xml(buffer, data_entry.Size);
+	delete [] buffer;
+	std::istringstream stream(str_xml);
+
+
+	//parse buffer: return AssemblyIdenty instances from the parsed XML
+	std::vector<AssemblyIdentity> asm_vec;
+	if (parser.parse_manifest(stream, asm_vec))
+	{
+		//for each AssemblyIdenty
+		boost::filesystem::path dir_path;
+		std::vector<boost::filesystem::path> file_cache;
+		BOOST_FOREACH(const AssemblyIdentity& asm_id, asm_vec){
+			//given an assemblyIdentity, return the corressponding WinSXS folder
+			if (parser.get_winsxs_directory_for_assembly(asm_id, dir_path, this->machine_type())){
+				// get file(s) inside this folder.
+				WindowsSharedLibraryLoader::fill_file_cache(dir_path, file_cache);
+				BOOST_FOREACH(const boost::filesystem::path &file, file_cache){
+					//fill assembly map. Key is file name, value is full path with file name: [filename] = full_filename_path
+					boost::filesystem::path const &filename = file.filename();
+					assembly_maps[filename.string()] = dir_path / filename;
+				}
+			}
+		}
+	}
+
+	return true;
 }
 
 /**
@@ -468,74 +540,315 @@ bool pe_decoder<_Bits>::parse_manifest(std::map<std::string, boost::filesystem::
 template <typename _Bits>
 bool pe_decoder<_Bits>::find_module_path(boost::filesystem::path const &containing_module_path, std::string &module_name) const
 {
-    //get the windows' specific environment
-    WindowsSharedLibraryLoader windows_env = dynamic_cast<WindowsSharedLibraryLoader&>(Env::get(WINDOWS_SHARED_LIBRARY_LOADER_ENV_NAME));
+	//get the windows' specific environment
+	WindowsSharedLibraryLoader windows_env = dynamic_cast<WindowsSharedLibraryLoader&>(Env::get(WINDOWS_SHARED_LIBRARY_LOADER_ENV_NAME));
 
-    bool result = false;
-    boost::filesystem::path full_path;
+	bool result = false;
+	boost::filesystem::path full_path;
 
-    PeFileHeader::machine_type_t machine = static_cast<PeFileHeader::machine_type_t>(_pe_data.nt_headers().FileHeader.Machine);
+	PeFileHeader::machine_type_t machine = static_cast<PeFileHeader::machine_type_t>(_pe_data.nt_headers().FileHeader.Machine);
 
-    //check if this module is part of the apisetschema redirection scheme: if not parse as usual.
-    if (!boost::starts_with(module_name, WINDOWS_APISETSCHEMA_API_START) &&
-        !boost::starts_with(module_name, WINDOWS_APISETSCHEMA_EXT_START))
-    {
-        //check if the module is part of winSXS redirection
-        std::map<std::string, boost::filesystem::path>::const_iterator asm_it = _assembly_maps.find(module_name);
-        if (asm_it != _assembly_maps.end())
-        {
-            module_name = asm_it->second.string();
-            result = true;
-        }
+	//check if this module is part of the apisetschema redirection scheme: if not parse as usual.
+	if (!boost::starts_with(module_name, WINDOWS_APISETSCHEMA_API_START) &&
+		!boost::starts_with(module_name, WINDOWS_APISETSCHEMA_EXT_START))
+	{
+		//check if the module is part of winSXS redirection
+		std::map<std::string, boost::filesystem::path>::const_iterator asm_it = _assembly_maps.find(module_name);
+		if (asm_it != _assembly_maps.end())
+		{
+			module_name = asm_it->second.string();
+			result = true;
+		}
 
-        //otherwise, search for the module full path, given the current env.
-        else if (result = windows_env(full_path, module_name, machine) == true){
-            module_name = full_path.string();
-        }
-        else{
-            //we need to search the current folder of the module (if the module is not found in known folders from Env)
-            // for this we have the full containing module path (that is, the module from wich module_name is imported).
-            boost::filesystem::path containing_module_dir = containing_module_path.parent_path();
-            if (!containing_module_dir.empty())
-            {
-                Env::paths_type paths;
-                paths.push_back(containing_module_dir);
+		//otherwise, search for the module full path, given the current env.
+		else if (result = windows_env(full_path, module_name, machine) == true){
+			module_name = full_path.string();
+		}
+		else{
+			//we need to search the current folder of the module (if the module is not found in known folders from Env)
+			// for this we have the full containing module path (that is, the module from wich module_name is imported).
+			boost::filesystem::path containing_module_dir = containing_module_path.parent_path();
+			if (!containing_module_dir.empty())
+			{
+				Env::paths_type paths;
+				paths.push_back(containing_module_dir);
 
-                // check if module_name is in current directory.
-                boost::filesystem::path out_path;
-                if (result = windows_env.which(out_path, paths, module_name))
-                {
-                    //found the module in the current directory!
-                    module_name = out_path.string();
-                }
-            }
-        }
-    }
-    else{
-        // While parsing imported modules from system modules we might find system modules starting with 'api-' or 'ext-'.
-        // These system modules are resolved using the apisetmap cache.
+				// check if module_name is in current directory.
+				boost::filesystem::path out_path;
+				if (result = windows_env.which(out_path, paths, module_name))
+				{
+					//found the module in the current directory!
+					module_name = out_path.string();
+				}
+			}
+		}
+	}
+	else{
+		// While parsing imported modules from system modules we might find system modules starting with 'api-' or 'ext-'.
+		// These system modules are resolved using the apisetmap cache.
 
-        //remove 'api-' or 'ext-' and '.dll'
-        std::string module_name_no_prefix = module_name.substr(4, module_name.length() - 4);
-        std::string module_name_no_prefix_no_ext = module_name_no_prefix.substr(0, module_name_no_prefix.length() - 4);
-        //search DLL redirection in the cache
-        std::map<std::string, std::string> cache = windows_env.apisetmap_cache();
-        std::map<std::string, std::string>::iterator it = cache.find(module_name_no_prefix_no_ext);
-        if (it != cache.end()){
-            //if redirection found in cache then search for the full redirection path.
-            if (result = windows_env(full_path, it->second, machine) == true){
-                std::string real_module_name (full_path.string());
-                /*
-                logging::log(logging::info) << containing_module_path << " is importing " << module_name <<
-                    " by apisetschema redirection. (redirects to: " << real_module_name << " )" << std::endl;
-                */
-                module_name = real_module_name;
-            }
-        }
-    }
+		//remove 'api-' or 'ext-' and '.dll'
+		std::string module_name_no_prefix = module_name.substr(4, module_name.length() - 4);
+		std::string module_name_no_prefix_no_ext = module_name_no_prefix.substr(0, module_name_no_prefix.length() - 4);
+		//search DLL redirection in the cache
+		std::map<std::string, std::string> cache = windows_env.apisetmap_cache();
+		std::map<std::string, std::string>::iterator it = cache.find(module_name_no_prefix_no_ext);
+		if (it != cache.end()){
+			//if redirection found in cache then search for the full redirection path.
+			if (result = windows_env(full_path, it->second, machine) == true){
+				std::string real_module_name (full_path.string());
+				/*
+				logging::log(logging::info) << containing_module_path << " is importing " << module_name <<
+					" by apisetschema redirection. (redirects to: " << real_module_name << " )" << std::endl;
+				*/
+				module_name = real_module_name;
+			}
+		}
+	}
 
-    return result;
+	return result;
 }
+
+/*****************************************
+	GET_IMPORTED_SYMBOLS
+*****************************************/
+
+template <typename _Bits>
+bool pe_decoder<_Bits>::get_imported_symbols(boost::filesystem::path const &module_path, std::vector<std::string> &imported_symbols) const {
+	logging::log(logging::info) <<"start_imported_symbols" << std::endl;
+	uint32_t imp_rva =
+	   _pe_data.nt_headers().OptionalHeader.DataDirectory[PeDataDirectory::kEntryImport]
+		.VirtualAddress;
+	uint32_t imp_len =
+		_pe_data.nt_headers().OptionalHeader.DataDirectory[PeDataDirectory::kEntryImport]
+		.Size;
+
+	if (imp_rva == 0x0 || imp_len == 0x0)
+	{
+		//check if this module is part of the apisetschema redirection scheme
+		//	in this case there's no import table, we'll do the redirection statically.
+		std::string module_filename = module_path.filename().string();
+		if (boost::starts_with(module_filename, WINDOWS_APISETSCHEMA_API_START) ||
+			boost::starts_with(module_filename, WINDOWS_APISETSCHEMA_EXT_START))
+		{
+			std::string empty;
+			find_module_path(module_path, empty);
+			logging::log(logging::warning) << "Apisetschema redirection scheme" << std::endl;
+			return false;
+		}
+		else{
+			// not a redirection scheme and no import table...
+			// Note: do NOT throw, we might have modules that do not export anything!
+			logging::log(logging::error) << "module " << module_path << " has no import table." << std::endl;
+			return false;
+		}
+	}
+
+	uint32_t imp_off;
+	if (!convert_rva_to_offset(imp_rva, imp_off)){
+		logging::log(logging::error) << "pe_decoder: bad convert_rva_to_offset"<< std::endl;
+		throw std::runtime_error("pe_decoder: bad convert_rva_to_offset");
+	}
+	PeImportDescriptor imp_desc, imp_end;
+	::memset(&imp_end, 0x0, sizeof(imp_end));
+	do{
+
+		//read import descriptor
+		_file.seekg(imp_off, std::ios_base::beg);
+		if (!_file.read(reinterpret_cast<char*>(&imp_desc), sizeof(imp_desc))){
+		logging::log(logging::error) << "pe_decoder: couldn't read import descriptor"<< std::endl;
+			// critical error: can't read PE file...
+			throw std::runtime_error("pe_decoder: couldn't read import descriptor");
+		}
+
+		imp_off += sizeof(imp_desc);
+
+/****************************************************
+PeImportDescriptor _imp_dep;
+_imp_dep.FirstThunk => rva to offset => rva to offset bis => skip 2 char + read
+***************************************************/
+	uint32_t thunk_off;
+	if(imp_desc.OriginalFirstThunk==0){
+		logging::log(logging::info) <<"out_imported_symbols" << std::endl;
+		return true;
+	}
+	if (!convert_rva_to_offset(imp_desc.OriginalFirstThunk, thunk_off)){
+		logging::log(logging::error) << "pe_decoder: couldn't convert import FirstThunk rva to offset"<< std::endl;
+		return false;
+	}
+
+//readThe Function RVA on the FristThunk :
+//TODO : make a function in data.cpp
+	
+	int step = sizeof(_pe_data.nt_headers().OptionalHeader.ImageBase);
+	uint64_t func_rva=1;
+	char func_buff[64];
+	uint64_t func_off=0;
+	bool bad_convert=false;
+
+	while(func_rva != 0){
+		func_rva=0;
+		func_off=0;
+		bool bad_convert=false;
+		std::string func_name;
+
+		if (!_file.seekg(thunk_off, std::ios_base::beg)){
+			logging::log(logging::error) << "pe_decoder: couldn't go to thunk offset"<< std::endl;
+			return false;
+		}
+
+		if(!_file.read(func_buff, step)){
+			logging::log(logging::error) << "pe_decoder: couldn't find function name rva"<< std::endl;
+			return false;
+		}
+	
+
+		for (int k=0; k<step; k++){
+			func_rva += (uint64_t)(func_buff[k]+256)%256 * (int)(pow(256,k));
+		}
+
+		if(func_rva ==0){
+			logging::log(logging::info) << "func_rva=0" << std::endl;
+			break;
+		}
+		
+		if (!convert_rva_to_offset64(func_rva, func_off)){
+			logging::log(logging::info) << "Imported : N/A" << std::endl;
+			bad_convert=true;
+		}
+	
+		if(bad_convert == false){
+			func_off += 2;	
+
+			if (!_pe_data.read_line(func_off, func_name)){
+				logging::log(logging::error) << "couldn't read function name from dll (imported_symbols)"
+				<< " at offset " << std::hex << func_off << std::endl;
+				func_name="";
+					continue;
+			}else{
+
+				logging::log(logging::info) << "find imported symbol: " << func_name << std::endl;
+				imported_symbols.push_back(func_name);
+			}
+		}
+		thunk_off += step;
+		bad_convert=false;
+	}
+
+	} while (::memcmp(&imp_desc, &imp_end, sizeof(PeImportDescriptor)));
+	logging::log(logging::info) <<"out_imported_symbols" << std::endl;
+	return true;
+}
+
+template <typename _Bits>
+bool pe_decoder<_Bits>::get_delay_imports(const boost::filesystem::path  &module_path, std::vector<std::string> &imported_symbols) const
+{
+	logging::log(logging::info) <<"start_delay_imports" << std::endl;
+	uint32_t delay_imports_rva =
+		_pe_data.nt_headers().OptionalHeader.DataDirectory[PeDataDirectory::kEntryDelayImport]
+		.VirtualAddress;
+	uint32_t delay_imports_len =
+		_pe_data.nt_headers().OptionalHeader.DataDirectory[PeDataDirectory::kEntryDelayImport]
+		.Size;
+
+	if (delay_imports_rva == 0 || delay_imports_len == 0){
+	logging::log(logging::info) <<"no_delay_import: out" << std::endl;
+		return false;
+	}
+
+	uint32_t delay_imports_off;
+	if (!convert_rva_to_offset(delay_imports_rva, delay_imports_off)){
+	logging::log(logging::error) << "pe_decoder::get_delay_imports: bad convert_rva_to_offset"<< std::endl;
+		return false;
+	}
+
+	int step = sizeof(_pe_data.nt_headers().OptionalHeader.ImageBase);
+	uint32_t name_off=1;
+	while(name_off!=0){
+	name_off=0;
+	PeImageDelayImport delay_imports_dir;
+	if (!_pe_data.read(delay_imports_off, sizeof(PeImageDelayImport), reinterpret_cast<char*>(&delay_imports_dir))) {
+		logging::log(logging::error) << "pe_decoder::get_delay_imports: couldn't read delay_imports directory"<< std::endl;
+		return false;
+	}
+
+	if(delay_imports_dir.szName == 0){
+		logging::log(logging::info) <<"out_delay_imports: name_off = 0" << std::endl;
+		return true;
+	}
+
+	if (!convert_rva_to_offset(delay_imports_dir.szName, name_off)){
+		return false;
+	}
+
+	//TODO : associate name + ordinal + func pointer !
+	std::string dep_name;
+	if (!_pe_data.read_line(name_off, dep_name)){
+		//continue;
+	}else{
+		logging::log(logging::info) << "find delay_import dependencie: " << dep_name << std::endl;
+	}
+
+	uint64_t func_rva=1;
+	uint64_t func_off=0;
+	char func_buff[64];
+	std::string func_name;
+	uint32_t pINT;
+	if (!convert_rva_to_offset(delay_imports_dir.pINT, pINT)){
+		logging::log(logging::error) << "pe_decoder: couldn't convert import FirstThunk rva to offset"<< std::endl;
+		return false;
+	}
+
+	while(func_rva != 0){
+		func_rva=0;
+		func_off=0;
+
+		if (!_file.seekg(pINT, std::ios_base::beg)){
+			logging::log(logging::error) << "pe_decoder: couldn't find function name rva (delay_import)-go to pINT"<< std::endl;
+			return false;
+		}
+
+		if(!_file.read(func_buff, step)){
+			logging::log(logging::error) << "pe_decoder: couldn't find function name rva (delay_import)"<< std::endl;
+			return false;
+		}
+
+		for (int k=0; k<step; k++){
+			func_rva += (func_buff[k]+0x100)%0x100 * (pow(0x100,k));
+		}
+
+		if(func_rva !=0){
+
+			if (!convert_rva_to_offset64(func_rva, func_off)){
+				logging::log(logging::warning) << "WARNING : couldn't convert function rva to offset, pINT=" << pINT <<std::endl;
+			}else{
+				func_off += 2;	
+
+				if (!_pe_data.read_line(func_off, func_name)){
+					logging::log(logging::error) << "couldn't read function name from dll "
+					<< " at offset " << std::hex << func_off << std::endl;
+					func_name="";
+					//continue;
+				}else{
+
+					logging::log(logging::info) << "find imported function (delay_load): " << func_name << std::endl;
+					imported_symbols.push_back(func_name);
+				}
+			}
+		}
+		pINT += step;
+	}
+	logging::log(logging::info) <<"out_delay_imports" << std::endl;
+	delay_imports_off += sizeof(PeImageDelayImport);
+	}
+	return true;
+
+}
+
+/************************************************************/
+/************************************************************/
+/************************************************************/
+/************************************************************/
 
 /**
 * \brief Get all exported functions for a given module.
@@ -547,82 +860,86 @@ bool pe_decoder<_Bits>::find_module_path(boost::filesystem::path const &containi
 template <typename _Bits>
 bool pe_decoder<_Bits>::get_exports(const boost::filesystem::path  &module_path, std::vector<std::string> &exports) const
 {
-    uint32_t exp_rva =
-        _pe_data.nt_headers().OptionalHeader.DataDirectory[PeDataDirectory::kEntryExport]
-        .VirtualAddress;
-    uint32_t exp_len =
-        _pe_data.nt_headers().OptionalHeader.DataDirectory[PeDataDirectory::kEntryExport]
-        .Size;
+	uint32_t exp_rva =
+		_pe_data.nt_headers().OptionalHeader.DataDirectory[PeDataDirectory::kEntryExport]
+		.VirtualAddress;
+	uint32_t exp_len =
+		_pe_data.nt_headers().OptionalHeader.DataDirectory[PeDataDirectory::kEntryExport]
+		.Size;
 
-    if (exp_rva == 0 || exp_len == 0){
-        return false;
-    }
+	if (exp_rva == 0 || exp_len == 0){
+		return false;
+	}
 
-    uint32_t exp_off;
-    if (!convert_rva_to_offset(exp_rva, exp_off))
-        throw std::runtime_error("pe_decoder::get_exports: bad convert_rva_to_offset");
+	uint32_t exp_off;
+	if (!convert_rva_to_offset(exp_rva, exp_off))
+		throw std::runtime_error("pe_decoder::get_exports: bad convert_rva_to_offset");
 
-    PeImageExportDirectory export_dir;
-    if (!_pe_data.read(exp_off, sizeof(PeImageExportDirectory), reinterpret_cast<char*>(&export_dir))) {
-        throw std::runtime_error("pe_decoder::get_exports: couldn't read export directory");
-    }
+	PeImageExportDirectory export_dir;
+	if (!_pe_data.read(exp_off, sizeof(PeImageExportDirectory), reinterpret_cast<char*>(&export_dir))) {
+		throw std::runtime_error("pe_decoder::get_exports: couldn't read export directory");
+	}
 
-    /* notes:
-    total number of functions exported: PeImageExportDirectory::NumberOfFunctions
-    total number of function exported by name:  PeImageExportDirectory::NumberOfNames
-    total number of function exported by ordinal:  PeImageExportDirectory::NumberOfFunctions - PeImageExportDirectory::NumberOfNames
-    */
+	/* notes:
+	total number of functions exported: PeImageExportDirectory::NumberOfFunctions
+	total number of function exported by name:  PeImageExportDirectory::NumberOfNames
+	total number of function exported by ordinal:  PeImageExportDirectory::NumberOfFunctions - PeImageExportDirectory::NumberOfNames
+	*/
 
 
-    //get offset to ordinal table
-    uint32_t off_name_ord;
-    if (!convert_rva_to_offset(export_dir.AddressOfNameOrdinals, off_name_ord)){
-        return false;
-    }
+	//get offset to ordinal table
+	uint32_t off_name_ord;
+	if (!convert_rva_to_offset(export_dir.AddressOfNameOrdinals, off_name_ord)){
+		return false;
+	}
 
-    // read ordinal table
-    uint16_t* ordinal_table;
-    if (!_pe_data.read(off_name_ord,
-        export_dir.NumberOfFunctions * sizeof(uint16_t),
-        reinterpret_cast<char**>(&ordinal_table))){
-        return false;
-    }
-    delete [] ordinal_table;
+	// read ordinal table
+	uint16_t* ordinal_table;
+	if (!_pe_data.read(off_name_ord,
+		export_dir.NumberOfFunctions * sizeof(uint16_t),
+		reinterpret_cast<char**>(&ordinal_table))){
+		return false;
+	}
+	delete [] ordinal_table;
 
-    //get offset to name table
-    uint32_t off_names;
-    if (!convert_rva_to_offset(export_dir.AddressOfNames, off_names)){
-        return false;
-    }
+	//get offset to name table
+	uint32_t off_names;
+	if (!convert_rva_to_offset(export_dir.AddressOfNames, off_names)){
+		return false;
+	}
 
-    // read the whole name table (each entry is an RVA [32-bit] to a char* string)
-    uint32_t* names_table;
-    if (!_pe_data.read(off_names,
-        export_dir.NumberOfNames * sizeof(uint32_t),
-        reinterpret_cast<char**>(&names_table))){
-        return false;
-    }
+	// read the whole name table (each entry is an RVA [32-bit] to a char* string)
+	uint32_t* names_table;
+	if (!_pe_data.read(off_names,
+		export_dir.NumberOfNames * sizeof(uint32_t),
+		reinterpret_cast<char**>(&names_table))){
+		return false;
+	}
 
-    for (unsigned int i = 0; i < export_dir.NumberOfNames; ++i){
-        //get RVA to func name in names table and convert this RVA to an offset
-        uint32_t rva_to_name = names_table[i];
-        uint32_t off_to_name;
-        if (!convert_rva_to_offset(rva_to_name, off_to_name)){
-            continue;
-        }
+	logging::log(logging::info) << "Nb of exported_symbol (name): " << export_dir.NumberOfNames << std::endl;
 
-        //TODO : associate name + ordinal + func pointer !
-        std::string func_name;
-        if (!_pe_data.read_line(off_to_name, func_name)){
-            continue;
-        }
+	for (unsigned int i = 0; i < export_dir.NumberOfNames; ++i){
+		//get RVA to func name in names table and convert this RVA to an offset
+		uint32_t rva_to_name = names_table[i];
+		uint32_t off_to_name;
+		if (!convert_rva_to_offset(rva_to_name, off_to_name)){
+			continue;
+		}
 
-        exports.push_back(func_name);
-    }
+		//TODO : associate name + ordinal + func pointer !
+		std::string func_name;
+		if (!_pe_data.read_line(off_to_name, func_name)){
+		logging::log(logging::info) << "can't read name" << std::endl;
+			continue;
+		}
 
-    delete[] names_table;
+	logging::log(logging::info) << "exported_symbol: " << func_name << std::endl;
+		exports.push_back(func_name);
+	}
 
-    return true;
+	delete[] names_table;
+
+	return true;
 
 }
 
@@ -633,52 +950,52 @@ bool pe_decoder<_Bits>::get_exports(const boost::filesystem::path  &module_path,
 template <typename _Bits>
 void pe_decoder<_Bits>::extract_hardening_features(MetadataInfo &mi) const {
 
-    // first, check protections from DllCharacteristics in image_optional_header
-    uint16_t characteristics = _pe_data.nt_headers().OptionalHeader.DllCharacteristics;
-    if (characteristics & IMAGE_DLLCHARACTERISTICS_HIGH_ENTROPY_VA)
-        mi.add_hardening_feature(MetadataInfo::PE_HIGH_ENTROPY_VA);
-    if (characteristics & IMAGE_DLLCHARACTERISTICS_DYNAMIC_BASE)
-        mi.add_hardening_feature(MetadataInfo::PE_DYNAMIC_BASE);
-    if (characteristics & IMAGE_DLLCHARACTERISTICS_FORCE_INTEGRITY)
-        mi.add_hardening_feature(MetadataInfo::PE_FORCE_INTEGRITY);
-    if (characteristics & IMAGE_DLLCHARACTERISTICS_NX_COMPAT)
-        mi.add_hardening_feature(MetadataInfo::PE_NX_COMPAT);
-    if (characteristics & IMAGE_DLLCHARACTERISTICS_APPCONTAINER)
-        mi.add_hardening_feature(MetadataInfo::PE_APPCONTAINER);
-    if (characteristics & IMAGE_DLLCHARACTERISTICS_GUARD_CF)
-        mi.add_hardening_feature(MetadataInfo::PE_GUARD_CF);
+	// first, check protections from DllCharacteristics in image_optional_header
+	uint16_t characteristics = _pe_data.nt_headers().OptionalHeader.DllCharacteristics;
+	if (characteristics & IMAGE_DLLCHARACTERISTICS_HIGH_ENTROPY_VA)
+		mi.add_hardening_feature(MetadataInfo::PE_HIGH_ENTROPY_VA);
+	if (characteristics & IMAGE_DLLCHARACTERISTICS_DYNAMIC_BASE)
+		mi.add_hardening_feature(MetadataInfo::PE_DYNAMIC_BASE);
+	if (characteristics & IMAGE_DLLCHARACTERISTICS_FORCE_INTEGRITY)
+		mi.add_hardening_feature(MetadataInfo::PE_FORCE_INTEGRITY);
+	if (characteristics & IMAGE_DLLCHARACTERISTICS_NX_COMPAT)
+		mi.add_hardening_feature(MetadataInfo::PE_NX_COMPAT);
+	if (characteristics & IMAGE_DLLCHARACTERISTICS_APPCONTAINER)
+		mi.add_hardening_feature(MetadataInfo::PE_APPCONTAINER);
+	if (characteristics & IMAGE_DLLCHARACTERISTICS_GUARD_CF)
+		mi.add_hardening_feature(MetadataInfo::PE_GUARD_CF);
 
-    // check other protections from load configuration directory
-    uint32_t load_config_rva =
-        _pe_data.nt_headers().OptionalHeader.DataDirectory[PeDataDirectory::kEntryLoadConfig]
-        .VirtualAddress;
+	// check other protections from load configuration directory
+	uint32_t load_config_rva =
+		_pe_data.nt_headers().OptionalHeader.DataDirectory[PeDataDirectory::kEntryLoadConfig]
+		.VirtualAddress;
 
-    uint32_t load_config_len =
-        _pe_data.nt_headers().OptionalHeader.DataDirectory[PeDataDirectory::kEntryLoadConfig]
-        .Size;
+	uint32_t load_config_len =
+		_pe_data.nt_headers().OptionalHeader.DataDirectory[PeDataDirectory::kEntryLoadConfig]
+		.Size;
 
-    if (load_config_rva != 0 && load_config_len != 0) {
-        // read image load configuration directory (support PE/PE+)
-        uint32_t load_config_off;
-        if (convert_rva_to_offset(load_config_rva, load_config_off)){
-            PeImageLoadConfigDirectory ilcd;
-            if (!_pe_data.read(load_config_off, sizeof(ilcd), reinterpret_cast<char*>(&ilcd))){
-                throw std::runtime_error("pe_decoder::extract_hardening_features: couldn't read image load configuration directory");
-            }
+	if (load_config_rva != 0 && load_config_len != 0) {
+		// read image load configuration directory (support PE/PE+)
+		uint32_t load_config_off;
+		if (convert_rva_to_offset(load_config_rva, load_config_off)){
+			PeImageLoadConfigDirectory ilcd;
+			if (!_pe_data.read(load_config_off, sizeof(ilcd), reinterpret_cast<char*>(&ilcd))){
+				throw std::runtime_error("pe_decoder::extract_hardening_features: couldn't read image load configuration directory");
+			}
 
-            //check /GS (stack cookie / canary)
-            if (ilcd.ImageLoadConfigDirectory.SecurityCookie != 0) {
-                mi.add_hardening_feature(MetadataInfo::PE_STACK_PROTECTED);
-            }
+			//check /GS (stack cookie / canary)
+			if (ilcd.ImageLoadConfigDirectory.SecurityCookie != 0) {
+				mi.add_hardening_feature(MetadataInfo::PE_STACK_PROTECTED);
+			}
 
-            // check SEH. It can only be present if NO_SEH is 0
-            if ((characteristics & IMAGE_DLLCHARACTERISTICS_NO_SEH) == 0){
-                // if Handler count and handler table, then /SAFESEH is present
-                if (ilcd.ImageLoadConfigDirectory.SEHandlerCount != 0 && ilcd.ImageLoadConfigDirectory.SEHandlerTable != 0)
-                    mi.add_hardening_feature(MetadataInfo::PE_SAFE_SEH);
-            }
-        }
-    }
+			// check SEH. It can only be present if NO_SEH is 0
+			if ((characteristics & IMAGE_DLLCHARACTERISTICS_NO_SEH) == 0){
+				// if Handler count and handler table, then /SAFESEH is present
+				if (ilcd.ImageLoadConfigDirectory.SEHandlerCount != 0 && ilcd.ImageLoadConfigDirectory.SEHandlerTable != 0)
+					mi.add_hardening_feature(MetadataInfo::PE_SAFE_SEH);
+			}
+		}
+	}
 }
 
 /**
@@ -690,8 +1007,14 @@ void pe_decoder<_Bits>::extract_hardening_features(MetadataInfo &mi) const {
 */
 template <typename _Bits>
 bool pe_decoder<_Bits>::convert_rva_to_offset(uint32_t rva,
-    uint32_t &offset) const {
-    return _pe_data.convert_rva_to_offset(rva, offset);
+	uint32_t &offset) const {
+	return _pe_data.convert_rva_to_offset(rva, offset);
+}
+
+template <typename _Bits>
+bool pe_decoder<_Bits>::convert_rva_to_offset64(uint64_t rva,
+	uint64_t &offset) const {
+	return _pe_data.convert_rva_to_offset64(rva, offset);
 }
 
 // explicit template specialisation

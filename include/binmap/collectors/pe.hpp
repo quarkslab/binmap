@@ -400,6 +400,19 @@ struct PeImageExportDirectory {
     uint32_t   AddressOfNameOrdinals;  // RVA from base of image
 };
 
+/*******************
+    delay_imports
+********************/
+struct PeImageDelayImport {
+	uint32_t dd_grAttrs;
+	uint32_t szName;
+	uint32_t phmod;
+	uint32_t pIAT;
+	uint32_t pINT;
+	uint32_t pBoundIAT;
+	uint32_t pUnloadIAT;
+	uint32_t dwTimeStamp;
+};
 /************
 
   templates
