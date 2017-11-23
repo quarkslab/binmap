@@ -127,7 +127,7 @@ public:
 			// error during its processing
 			logging::log(logging::warning) << "bad format: skipping "
 						   << input_file
-						   << " (error was:" << e.what()
+						   << " (error was:" << e.what() << ')'
 						   << std::endl;
 			// still write dummy metadata for consistency
 			blobmap_.metadata()->insert(MetadataInfo(input_hash));

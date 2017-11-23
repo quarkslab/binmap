@@ -43,7 +43,7 @@ if(NOT EXISTS "${LIEF_ROOT}/share/LIEF/cmake" AND USE_LIEF)
   ExternalProject_Add(LIEF
     PREFIX           "${LIEF_PREFIX}"
     GIT_REPOSITORY   ${LIEF_GIT_URL}
-    GIT_TAG          master
+    GIT_TAG          0.8.3
     INSTALL_DIR      ${LIEF_INSTALL_DIR}
     CMAKE_ARGS       ${LIEF_CMAKE_ARGS}
     BUILD_BYPRODUCTS ${LIEF_LIBRARIES}

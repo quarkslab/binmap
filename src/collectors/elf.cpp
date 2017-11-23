@@ -59,6 +59,9 @@ public:
 
   bool initialize(boost::filesystem::path const &input_file)
   {
+    if (not boost::filesystem::exists(input_file))
+      return false;
+
     if (boost::filesystem::is_symlink(input_file))
       return false;
 
