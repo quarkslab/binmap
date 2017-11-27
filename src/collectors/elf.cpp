@@ -69,7 +69,6 @@ public:
     const char* cpath = path_.string().c_str();
     if (is_elf(cpath)) {
       this->elf_binary_ = elf_parse(cpath);
-      std::cout << cpath << std::endl;
       return true;
     } else {
       return false;

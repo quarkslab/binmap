@@ -15,6 +15,7 @@
 //
 
 #include "binmap/log.hpp"
+#include "LIEF/logging.hpp"
 
 namespace logging {
 
@@ -22,7 +23,11 @@ Log log;
 
 Log::Log() : current_level_(error) {}
 
-void Log::set(verbosity_level lvl) { current_level_ = lvl; }
+void Log::set(verbosity_level lvl) {
+  current_level_ = lvl;
+  if(lvl != verbosity_level::info)
+    LIEF::Logger::disable();
+}
 
 static std::ostream cnull(0);
 
