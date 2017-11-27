@@ -160,6 +160,7 @@ public:
     mapping_[key] = v;
 
     boost::put(boost::vertex_name_t(), graph_, v, key);
+    return key;
   }
 
   vertex_iterator begin() const { return boost::vertices(graph_).first; }
