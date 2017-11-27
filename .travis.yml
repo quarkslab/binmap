@@ -35,5 +35,5 @@ script:
       -DCMAKE_INSTALL_PREFIX=$PWD/install
       -DBINMAP_FULL=${BINMAP_FULL}
     - make
-    - test "${BINMAP_FULL}" = OFF || make test
+    - test "${BINMAP_FULL}" = OFF || make test ARGS="-V"
     - make install
