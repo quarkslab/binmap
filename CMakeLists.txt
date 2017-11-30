@@ -12,18 +12,20 @@ set(LIEF_VERSION 0.7.0 CACHE STRING "LIEF version to be used")
 
 option(USE_LIEF "Use LIEF as collector" ON)
 set(LIEF_FROM_EXTERNAL_PROJECT OFF)
-
+if (USE_LIEF)
+  add_definitions(-DUSE_LIEF)
+endif()
 if(NOT EXISTS "${LIEF_ROOT}/share/LIEF/cmake" AND USE_LIEF)
   message(STATUS "Setting LIEF as an External project")
   set(LIEF_FROM_EXTERNAL_PROJECT ON)
   # Setup LIEF as an External Project
   set(LIEF_PREFIX       "${CMAKE_CURRENT_BINARY_DIR}/LIEF")
-  set(LIEF_INSTALL_DIR  "${LIEF_PREFIX}")
-  set(LIEF_INCLUDE_DIRS "${LIEF_PREFIX}/include")
+  set(LIEF_INSTALL_DIR  "${LIEF_PREFIX}/install")
+  set(LIEF_INCLUDE_DIRS "${LIEF_INSTALL_DIR}/include")
 
   # LIEF static library
   set(LIEF_LIBRARIES
-    "${LIEF_PREFIX}/lib/${CMAKE_STATIC_LIBRARY_PREFIX}LIEF${CMAKE_STATIC_LIBRARY_SUFFIX}")
+    "${LIEF_INSTALL_DIR}/lib/${CMAKE_STATIC_LIBRARY_PREFIX}LIEF${CMAKE_STATIC_LIBRARY_SUFFIX}")
 
   # URL of the LIEF repo (Can be your fork)
   set(LIEF_GIT_URL "https://github.com/lief-project/LIEF.git")
@@ -43,7 +45,7 @@ if(NOT EXISTS "${LIEF_ROOT}/share/LIEF/cmake" AND USE_LIEF)
   ExternalProject_Add(LIEF
     PREFIX           "${LIEF_PREFIX}"
     GIT_REPOSITORY   ${LIEF_GIT_URL}
-    GIT_TAG          0.8.3
+    GIT_TAG          66b484938aefdb33143f8a963cf931eebc304a47
     INSTALL_DIR      ${LIEF_INSTALL_DIR}
     CMAKE_ARGS       ${LIEF_CMAKE_ARGS}
     BUILD_BYPRODUCTS ${LIEF_LIBRARIES}
@@ -254,6 +256,11 @@ if(BINMAP_FULL)
     endif()
 
     target_link_libraries(blobmap ${PYTHON_LIBRARIES} ${OPENSSL_LIBRARIES} ${Boost_LIBRARIES})
+
+  if (USE_LIEF AND LIEF_FROM_EXTERNAL_PROJECT)
+    add_dependencies(blobmap LIEF) # For logging module
+    target_link_libraries(blobmap ${LIEF_LIBRARIES})
+  endif()
 endif()
 
 
