@@ -200,7 +200,6 @@ class ScanCommand : public SubCommand {
       }
       // otherwise, keep inputs[0] as it is the sole entry point
     }
-
     return scan(inputs, output, root, blacklist);
   }
 

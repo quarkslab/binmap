@@ -16,13 +16,27 @@
 
 #include "binmap/log.hpp"
 
+#ifdef USE_LIEF
+#include "LIEF/logging.h"
+#endif
 namespace logging {
 
 Log log;
 
 Log::Log() : current_level_(error) {}
 
-void Log::set(verbosity_level lvl) { current_level_ = lvl; }
+void Log::set(verbosity_level lvl) {
+  current_level_ = lvl;
+
+#ifdef USE_LIEF
+  if(lvl != info) {
+    lief_logging_disable();
+  } else {
+    lief_logging_enable();
+  }
+#endif
+
+}
 
 static std::ostream cnull(0);
 

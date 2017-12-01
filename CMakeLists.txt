@@ -1,12 +1,63 @@
 ##################################################################################""
-cmake_minimum_required(VERSION 2.6)
+cmake_minimum_required(VERSION 3.2)
 project(binmap C CXX)
+include(ExternalProject)
 ##################################################################################""
 
 ##################################################################################""
 # cmake extensions
 ##################################################################################""
-set(CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/cmake)
+set(LIEF_ROOT CACHE PATH "${CMAKE_INSTALL_PREFIX}")
+set(LIEF_VERSION 0.7.0 CACHE STRING "LIEF version to be used")
+
+option(USE_LIEF "Use LIEF as collector" ON)
+set(LIEF_FROM_EXTERNAL_PROJECT OFF)
+if (USE_LIEF)
+  add_definitions(-DUSE_LIEF)
+endif()
+if(NOT EXISTS "${LIEF_ROOT}/share/LIEF/cmake" AND USE_LIEF)
+  message(STATUS "Setting LIEF as an External project")
+  set(LIEF_FROM_EXTERNAL_PROJECT ON)
+  # Setup LIEF as an External Project
+  set(LIEF_PREFIX       "${CMAKE_CURRENT_BINARY_DIR}/LIEF")
+  set(LIEF_INSTALL_DIR  "${LIEF_PREFIX}/install")
+  set(LIEF_INCLUDE_DIRS "${LIEF_INSTALL_DIR}/include")
+
+  # LIEF static library
+  set(LIEF_LIBRARIES
+    "${LIEF_INSTALL_DIR}/lib/${CMAKE_STATIC_LIBRARY_PREFIX}LIEF${CMAKE_STATIC_LIBRARY_SUFFIX}")
+
+  # URL of the LIEF repo (Can be your fork)
+  set(LIEF_GIT_URL "https://github.com/lief-project/LIEF.git")
+
+  # LIEF compilation config
+  set(LIEF_CMAKE_ARGS
+    -DCMAKE_INSTALL_PREFIX=<INSTALL_DIR>
+    -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
+    -DLIEF_DOC=off
+    -DLIEF_PYTHON_API=off
+    -DLIEF_ENABLE_JSON=off
+    -DLIEF_EXAMPLES=off
+    -DCMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER}
+    -DCMAKE_C_COMPILER=${CMAKE_C_COMPILER}
+  )
+
+  ExternalProject_Add(LIEF
+    PREFIX           "${LIEF_PREFIX}"
+    GIT_REPOSITORY   ${LIEF_GIT_URL}
+    GIT_TAG          66b484938aefdb33143f8a963cf931eebc304a47
+    INSTALL_DIR      ${LIEF_INSTALL_DIR}
+    CMAKE_ARGS       ${LIEF_CMAKE_ARGS}
+    BUILD_BYPRODUCTS ${LIEF_LIBRARIES}
+    UPDATE_COMMAND   ""
+  )
+  set(LIEF_FOUND TRUE)
+elseif(USE_LIEF)
+  list(APPEND CMAKE_MODULE_PATH "${LIEF_ROOT}/share/LIEF/cmake" ${CMAKE_SOURCE_DIR}/cmake)
+  include(FindLIEF)
+  find_package(LIEF ${LIEF_VERSION} COMPONENTS STATIC)
+endif()
+
 
 ##################################################################################""
 # version
@@ -19,6 +70,7 @@ set(BINMAP_VERSION_MINOR 1)
 ##################################################################################""
 option(BINMAP_FULL "Build ${CMAKE_PROJECT_NAME} tools in addition to the scanner" ON)
 set(BINMAP_DRIVERS "native" CACHE STRING "drivers used by the scanners")
+
 
 if(BINMAP_FULL)
     # full fledge mode, shared libraries etc
@@ -50,12 +102,13 @@ endif()
 if("${BINMAP_DRIVERS}" STREQUAL native)
     set(BINMAP_DRIVERS "")
     set(BINMAP_DRIVER_LIBRARIES "")
-    # ELF
-    find_package(GElf)
-    if(GELF_FOUND)
+
+    if(LIEF_FOUND)
+        include_directories("${LIEF_INCLUDE_DIRS}")
         set(BINMAP_DRIVERS ${BINMAP_DRIVERS} ELF)
-        set(BINMAP_DRIVER_LIBRARIES ${BINMAP_DRIVER_LIBRARIES} ${GELF_LIBRARIES})
+        set(BINMAP_DRIVER_LIBRARIES ${BINMAP_DRIVER_LIBRARIES} ${LIEF_LIBRARIES})
     endif()
+
     # LINK always set, boost filesystem handles it
     set(BINMAP_DRIVERS ${BINMAP_DRIVERS} PE LINK DEFAULT)
 endif()
@@ -118,7 +171,6 @@ if(BINMAP_FULL)
     find_package(PythonLibs 2.7 REQUIRED)
 endif()
 
-
 ##################################################################################""
 # paths
 ##################################################################################""
@@ -175,16 +227,18 @@ if(BINMAP_FULL)
         src/view.cpp
         )
 endif()
-
 add_executable(binmap ${BINMAP_SOURCES})
-
 target_link_libraries(binmap
     ${Boost_LIBRARIES}
     ${ZLIB_LIBRARIES}
     ${OPENSSL_LIBRARIES}
     ${BINMAP_DRIVER_LIBRARIES}
     ${CMAKE_THREAD_LIBS_INIT}
-    )
+)
+
+if (USE_LIEF AND LIEF_FROM_EXTERNAL_PROJECT)
+  add_dependencies(binmap LIEF)
+endif()
 
 if(BINMAP_FULL)
     target_link_libraries(binmap ${PYTHON_LIBRARIES})
@@ -202,6 +256,11 @@ if(BINMAP_FULL)
     endif()
 
     target_link_libraries(blobmap ${PYTHON_LIBRARIES} ${OPENSSL_LIBRARIES} ${Boost_LIBRARIES})
+
+  if (USE_LIEF AND LIEF_FROM_EXTERNAL_PROJECT)
+    add_dependencies(blobmap LIEF) # For logging module
+    target_link_libraries(blobmap ${LIEF_LIBRARIES})
+  endif()
 endif()
 
 
@@ -279,10 +338,10 @@ if(BINMAP_FULL)
     add_test(binmap_python_interface_hardening_all python -c "from blobmap import BlobMap as BM ; g = BM('hardening_all.dat').last() ; assert g['${CMAKE_SOURCE_DIR}/tests/hardening-all'].hardening_features == {'fortified', 'stack-protected', 'immediate-binding', 'read-only-relocations', 'pie'}")
     add_test(binmap_python_interface_hardening_none python -c "from blobmap import BlobMap as BM ; g = BM('hardening_none.dat').last() ; assert not g['${CMAKE_SOURCE_DIR}/tests/hardening-none'].hardening_features")
     add_test(binmap_hardening_all_pe binmap scan -ohardening_all_pe.dat ${CMAKE_SOURCE_DIR}/tests/pe-hardening-all.exe)
-    add_test(binmap_hardening_none_pe binmap scan -ohardening_none_pe.dat ${CMAKE_SOURCE_DIR}/tests/pe-hardening-none.exe)    
+    add_test(binmap_hardening_none_pe binmap scan -ohardening_none_pe.dat ${CMAKE_SOURCE_DIR}/tests/pe-hardening-none.exe)
     add_test(binmap_python_interface_hardening_all_pe python -c "from blobmap import BlobMap as BM ; g = BM('hardening_all_pe.dat').last() ; assert g['${CMAKE_SOURCE_DIR}/tests/pe-hardening-all.exe'].hardening_features == { 'pe-stack-protected', 'pe-safe-seh', 'pe-dynamic-base', 'pe-high-entropy-va', 'pe-force-integrity', 'pe-nx-compat', 'pe-appcontainer', 'pe-guard-cf'}")
     add_test(binmap_python_interface_hardening_none_pe python -c "from blobmap import BlobMap as BM ; g = BM('hardening_none_pe.dat').last() ; assert not g['${CMAKE_SOURCE_DIR}/tests/pe-hardening-none.exe'].hardening_features")
-    
+
     # test python interface
     add_test(binmap_python_interface_blobmap_len python -c "import blobmap ; g = blobmap.BlobMap('blobs.dat') ; print len(g)")
     add_test(binmap_python_interface_blobmap_iterkeys python -c "import blobmap ; g = blobmap.BlobMap('blobs.dat') ; print len(list(g.keys()))")
