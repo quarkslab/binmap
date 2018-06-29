@@ -429,6 +429,9 @@ BlobMap::graph_key_type const &BlobMap::back_key() const {
 Graph const &BlobMap::operator[](graph_key_type const &key) const {
   fetch_(key);
   graph_map_t::const_iterator where = graphs_.find(key);
+  if(where == graphs_.end()) {
+    throw std::runtime_error("no graph associated to this key");
+  }
   return *where->second;
 }
 
