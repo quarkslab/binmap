@@ -56,9 +56,13 @@ void Graph::successors(successors_type &succs,
 }
 void Graph::predecessors(successors_type &preds,
                          boost::filesystem::path const &key) const {
+  boost::unordered_map<boost::filesystem::path, graph_type::vertex_descriptor>::const_iterator where = mapping_.find(key);
+  if(where == mapping_.end())
+    throw std::out_of_range(key.string());
+
   graph_type::in_edge_iterator in_begin, in_end;
   for (boost::tie(in_begin, in_end) =
-           boost::in_edges(mapping_.find(key)->second, graph_);
+           boost::in_edges(where->second, graph_);
        in_begin != in_end; ++in_begin)
     preds.insert(this->key(boost::source(*in_begin, graph_)));
 }
